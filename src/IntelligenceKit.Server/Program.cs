@@ -2,8 +2,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using IntelligenceKit.Core.Models;
 using IntelligenceKit.Server;
+using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,9 +56,16 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 
+// Read-side auth: a single shared admin token gates every query endpoint and the
+// SignalR hub. Ingest (POST /events) stays open by design — the client's project
+// key is a public routing id, not a secret. See ReadTokenAuthHandler.
+builder.Services
+    .AddAuthentication(ReadTokenDefaults.Scheme)
+    .AddScheme<AuthenticationSchemeOptions, ReadTokenAuthHandler>(ReadTokenDefaults.Scheme, null);
+builder.Services.AddAuthorization();
+
 // The Blazor WASM dashboard is served from its own origin, so it needs CORS.
-// Read-only, no cookies/credentials — any origin may GET the API (and connect
-// to the SignalR hub, whose negotiate step is a CORS-checked request).
+// Auth is via bearer token (no cookies/credentials), so any origin may call.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(DashboardCors, policy =>
@@ -66,6 +75,8 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseCors(DashboardCors);
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Apply pending migrations on startup (creates the schema on first run).
 using (var scope = app.Services.CreateScope())
@@ -171,7 +182,7 @@ app.MapGet("/events", async (IntelligenceDbContext db, string? projectId, string
         .ToListAsync();
 
     return Results.Ok(new PagedResult<EventSummary>(total, skip, take, items));
-});
+}).RequireAuthorization();
 
 app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
 {
@@ -199,7 +210,7 @@ app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
         e.Timestamp, e.ReceivedAt);
 
     return Results.Ok(detail);
-});
+}).RequireAuthorization();
 
 // Screenshot blob for an event (the "last screen"). Uploaded separately from the
 // event so image bytes never ride inside the JSON payload.
@@ -244,7 +255,7 @@ app.MapGet("/events/{id:guid}/screenshot", async (Guid id, IntelligenceDbContext
 {
     var shot = await db.Screenshots.AsNoTracking().FirstOrDefaultAsync(s => s.EventId == id);
     return shot is null ? Results.NotFound() : Results.File(shot.Jpeg, shot.ContentType);
-});
+}).RequireAuthorization();
 
 app.MapGet("/projects", async (IntelligenceDbContext db) =>
 {
@@ -266,7 +277,7 @@ app.MapGet("/projects", async (IntelligenceDbContext db) =>
         .ToList();
 
     return Results.Ok(projects);
-});
+}).RequireAuthorization();
 
 // Events-per-hour time series for the dashboard chart. Buckets are filled with
 // zeros for quiet hours so the series is continuous. Grouping is done in memory
@@ -303,8 +314,8 @@ app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, string? pr
         buckets[i] = new TimeBucket(windowStart.AddHours(i), totals[i], exceptions[i]);
 
     return Results.Ok(buckets);
-});
+}).RequireAuthorization();
 
-app.MapHub<EventsHub>("/hubs/events");
+app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 
 app.Run();

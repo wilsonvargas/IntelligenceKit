@@ -149,14 +149,26 @@ A schema change means regenerating the migration in all three provider projects.
 
 ## Security
 
-⚠️ **The read API and dashboard are currently unauthenticated** (CORS is open, no auth on queries). This is a known gap being addressed before a stable release — do not expose a self-hosted instance to the public internet with real data yet. Adding read-side auth is a priority item on the roadmap.
+The **read side** — every query endpoint plus the SignalR hub and the dashboard — is gated by a single shared admin token. Set it on the server:
+
+```jsonc
+// src/IntelligenceKit.Server/appsettings.json
+"Auth": { "ReadToken": "ik_admin_<a-long-random-string>" }
+```
+
+Callers present it as `Authorization: Bearer <token>` (the dashboard prompts for it once and stores it in the browser). Behaviour when the token is **not** set: reads are **open in Development** (zero-config local runs) and **locked in Production** (fail-closed), so a misconfigured deployment never serves data unprotected.
+
+**Ingest** (`POST /events`) is intentionally open: the client's project key is a public routing identifier that ships inside the app, not a secret — the same model Sentry uses.
+
+> Still evolving: there are no per-user accounts or per-project scoping yet (one shared token). Put the server behind TLS in production.
 
 ## Roadmap
 
 Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart.
 
 Next:
-- [ ] LICENSE ✅ · README ✅ · **NuGet packaging** · **read-side auth** · **CI**
+- [x] LICENSE · README · **read-side auth** (shared admin token)
+- [ ] **NuGet packaging** · **CI**
 - [ ] Webhook alerts (Slack/Discord/Teams)
 - [ ] Issue grouping (fingerprint → deduplicated issues with counts & trends)
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
