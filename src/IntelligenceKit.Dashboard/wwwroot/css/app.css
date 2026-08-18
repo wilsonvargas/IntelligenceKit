@@ -234,3 +234,33 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+/* --- Read-token sign-in overlay --------------------------------------- */
+.auth-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+    padding: 1rem;
+}
+
+.auth-card {
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+    padding: 1.75rem;
+    width: 100%;
+    max-width: 22rem;
+}
+
+.auth-card h2 {
+    margin-top: 0;
+    font-size: 1.25rem;
+}
+
+.auth-card p {
+    color: #475569;
+    font-size: 0.9rem;
+}

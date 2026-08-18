@@ -1,4 +1,8 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject IntelligenceKit.Dashboard.Services.AuthState Auth
+@inject NavigationManager Nav
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
@@ -6,6 +10,10 @@
 
     <main>
         <div class="top-row px-4">
+            @if (Auth.HasToken)
+            {
+                <button class="btn btn-sm btn-link" @onclick="SignOut">Sign out</button>
+            }
             <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
 
@@ -14,3 +22,51 @@
         </article>
     </main>
 </div>
+
+@if (Auth.ChallengeRequired)
+{
+    <div class="auth-overlay">
+        <div class="auth-card">
+            <h2>Sign in</h2>
+            <p>
+                @(Auth.HasToken
+                    ? "The saved token was rejected. Enter a valid read token."
+                    : "This IntelligenceKit server requires a read token to view data.")
+            </p>
+            <input type="password" class="form-control" placeholder="Paste your read token"
+                   @bind="_token" @bind:event="oninput" @onkeydown="OnKeyDown" />
+            <button class="btn btn-primary mt-3" @onclick="SaveAsync"
+                    disabled="@string.IsNullOrWhiteSpace(_token)">Continue</button>
+        </div>
+    </div>
+}
+
+@code {
+    private string? _token;
+
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+
+    private void OnAuthChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_token))
+            await SaveAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        await Auth.SetTokenAsync(_token);
+        _token = null;
+        // Force a reload so every page re-fetches with the new token.
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    private async Task SignOut()
+    {
+        await Auth.SetTokenAsync(null);
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+}
