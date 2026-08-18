@@ -71,7 +71,7 @@ namespace Sample.Maui
         {
             var kit = Services.GetRequiredService<IIntelligenceKit>();
             kit.SetUser($"anonymous-{Random.Shared.Next(10000, 99999)}");
-            kit.SetTag("tier", "premium");
+            kit.SetTag("plan", "premium");
             StatusLabel.Text = "Usuario y tag asociados a los próximos eventos.";
         }
 

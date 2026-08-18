@@ -1,11 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IntelligenceKit Dashboard</title>
     <base href="/" />
+    <script>
+        // Apply the saved theme before first paint so there's no flash.
+        (function () {
+            try {
+                var t = localStorage.getItem('ik_theme') || 'dark';
+                document.documentElement.setAttribute('data-bs-theme', t);
+            } catch (e) { /* storage unavailable — stay on the default */ }
+        })();
+        window.ikSetTheme = function (t) {
+            try { localStorage.setItem('ik_theme', t); } catch (e) { }
+            document.documentElement.setAttribute('data-bs-theme', t);
+        };
+        window.ikGetTheme = function () {
+            return document.documentElement.getAttribute('data-bs-theme') || 'dark';
+        };
+    </script>
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
