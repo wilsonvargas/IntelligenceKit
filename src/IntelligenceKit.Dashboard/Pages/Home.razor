@@ -1,0 +1,195 @@
+@page "/"
+@implements IDisposable
+@inject ApiClient Api
+@inject NavigationManager Nav
+@inject LiveEventsClient Live
+
+<PageTitle>Projects — IntelligenceKit</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <h1 class="h3 mb-0">Overview</h1>
+        <span class="badge rounded-pill @(_live ? "text-bg-success" : "text-bg-secondary")">
+            <span class="live-dot @(_live ? "on" : "")"></span> @(_live ? "Live" : "Offline")
+        </span>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" @onclick="LoadAsync" disabled="@_loading">
+        @(_loading ? "Loading…" : "Refresh")
+    </button>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-baseline mb-2">
+            <h2 class="h6 text-muted mb-0">Events per hour · last 24h</h2>
+            <div class="small">
+                <span class="me-3"><span class="legend-swatch total"></span> total @_windowTotal</span>
+                <span><span class="legend-swatch exception"></span> exceptions @_windowExceptions</span>
+            </div>
+        </div>
+
+        @if (_stats is null)
+        {
+            <p class="text-muted mb-0">Loading chart…</p>
+        }
+        else if (_windowTotal == 0)
+        {
+            <p class="text-muted mb-0">No events in the last 24 hours.</p>
+        }
+        else
+        {
+            var max = Math.Max(1, _stats.Max(b => b.Total));
+            <svg class="events-chart" viewBox="0 0 @(_stats.Count * 10) 105" preserveAspectRatio="none" role="img" aria-label="Events per hour">
+                @for (var i = 0; i < _stats.Count; i++)
+                {
+                    var b = _stats[i];
+                    var x = i * 10 + 1.2;
+                    var totalH = b.Total / (double)max * 100.0;
+                    var exH = b.Exceptions / (double)max * 100.0;
+                    var otherH = totalH - exH;
+                    <g>
+                        <title>@b.Start.ToLocalTime().ToString("HH:mm") — @b.Total total, @b.Exceptions exceptions</title>
+                        @if (otherH > 0)
+                        {
+                            <rect x="@F(x)" y="@F(100 - totalH)" width="7.6" height="@F(otherH)" class="bar-total" />
+                        }
+                        @if (exH > 0)
+                        {
+                            <rect x="@F(x)" y="@F(100 - exH)" width="7.6" height="@F(exH)" class="bar-exception" />
+                        }
+                    </g>
+                }
+                <line x1="0" y1="100" x2="@(_stats.Count * 10)" y2="100" class="chart-axis" />
+            </svg>
+            <div class="d-flex justify-content-between text-muted small mt-1">
+                <span>@_stats[0].Start.ToLocalTime().ToString("HH:mm")</span>
+                <span>now</span>
+            </div>
+        }
+    </div>
+</div>
+
+<h2 class="h5 mb-2">Projects</h2>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_loading && _projects is null)
+{
+    <p class="text-muted">Loading projects…</p>
+}
+else if (_projects is { Count: 0 })
+{
+    <div class="alert alert-info">No events received yet. Once a client posts events they'll show up here.</div>
+}
+else if (_projects is not null)
+{
+    <div class="row g-3">
+        @foreach (var p in _projects)
+        {
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm project-card"
+                     role="button" @onclick="() => OpenProject(p.ProjectId)">
+                    <div class="card-body">
+                        <h3 class="h5 card-title text-truncate" title="@p.ProjectId">@p.ProjectId</h3>
+                        <div class="d-flex gap-4 mt-3">
+                            <div>
+                                <div class="fs-4 fw-semibold">@p.EventCount</div>
+                                <div class="text-muted small">events</div>
+                            </div>
+                            <div>
+                                <div class="fs-4 fw-semibold @(p.ExceptionCount > 0 ? "text-danger" : "")">@p.ExceptionCount</div>
+                                <div class="text-muted small">exceptions</div>
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-3">
+                            Last event: @p.LastEventAt.ToLocalTime().ToString("g")
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ProjectSummary>? _projects;
+    private List<TimeBucket>? _stats;
+    private int _windowTotal;
+    private int _windowExceptions;
+    private bool _loading;
+    private bool _live;
+    private bool _subscribed;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Live.EventReceived += OnLiveEvent;
+        _subscribed = true;
+        try
+        {
+            await Live.EnsureStartedAsync();
+            _live = Live.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected;
+        }
+        catch
+        {
+            _live = false;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _projects = await Api.GetProjectsAsync();
+            _stats = (await Api.GetEventsPerHourAsync(hours: 24)).ToList();
+            RecomputeTotals();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not reach the API: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnLiveEvent(EventSummary e)
+    {
+        if (_stats is null || _stats.Count == 0)
+            return;
+
+        // New events land in the most recent (last) bucket.
+        var last = _stats[^1];
+        _stats[^1] = last with
+        {
+            Total = last.Total + 1,
+            Exceptions = last.Exceptions + (string.Equals(e.EventType, "Exception", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+        };
+        RecomputeTotals();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RecomputeTotals()
+    {
+        _windowTotal = _stats?.Sum(b => b.Total) ?? 0;
+        _windowExceptions = _stats?.Sum(b => b.Exceptions) ?? 0;
+    }
+
+    private static string F(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private void OpenProject(string projectId)
+        => Nav.NavigateTo($"/events?projectId={Uri.EscapeDataString(projectId)}");
+
+    public void Dispose()
+    {
+        if (_subscribed)
+            Live.EventReceived -= OnLiveEvent;
+    }
+}
