@@ -447,3 +447,4 @@ graphify-out/
 *.db3
 *.db-shm
 *.db-wal
+artifacts/

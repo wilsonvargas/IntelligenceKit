@@ -23,7 +23,24 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 	</PropertyGroup>
 
+	<!-- NuGet package -->
+	<PropertyGroup>
+		<IsPackable>true</IsPackable>
+		<PackageId>IntelligenceKit.Maui</PackageId>
+		<Title>IntelligenceKit for .NET MAUI</Title>
+		<Description>One-line, self-hosted crash reporting and observability for .NET MAUI (Android/iOS) — a Sentry/App Center/Crashlytics alternative for the .NET ecosystem. Typed crash capture, offline store-and-forward, breadcrumbs, device context and opt-in last-screen capture, all via builder.UseIntelligenceKit(dsn).</Description>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);CS1591</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
   <ItemGroup>
+    <!-- Declares the MAUI dependency on the published package (and clears MA002). -->
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <!-- Pin the native SQLite bundle to a patched version; the one pulled in
