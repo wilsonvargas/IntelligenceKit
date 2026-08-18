@@ -1,0 +1,30 @@
+<Project>
+
+  <!--
+    Shared metadata for everything under src/. Only the publishable SDK packages
+    (Core, Maui) set <IsPackable>true</IsPackable>; the backend, dashboard and
+    migration assemblies inherit the default below and are never packed.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>Wilson Vargas</Authors>
+    <Company>IntelligenceKit</Company>
+    <Product>IntelligenceKit</Product>
+    <Copyright>Copyright (c) Wilson Vargas</Copyright>
+
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/wilsonvargas/IntelligenceKit</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/wilsonvargas/IntelligenceKit</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>observability;crash-reporting;logging;diagnostics;telemetry;maui;dotnet;sentry-alternative</PackageTags>
+
+    <!-- Not packable unless a project opts in. -->
+    <IsPackable>false</IsPackable>
+
+    <!-- Package hygiene (only affects projects that actually pack). -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>
