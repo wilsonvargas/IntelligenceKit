@@ -1,6 +1,7 @@
 @page "/events/{Id:guid}"
 @inject ApiClient Api
 @inject NavigationManager Nav
+@inject IntelligenceKit.Dashboard.Services.AuthState Auth
 
 <PageTitle>Event — IntelligenceKit</PageTitle>
 
@@ -208,7 +209,18 @@ else
 
     private void GoBack() => Nav.NavigateTo("/events");
 
-    private string ScreenshotUrl => $"{Api.BaseAddress}events/{Id}/screenshot";
+    private string ScreenshotUrl
+    {
+        // An <img> can't send an Authorization header, so the token rides as a
+        // query parameter (the server accepts access_token for this reason).
+        get
+        {
+            var url = $"{Api.BaseAddress}events/{Id}/screenshot";
+            return Auth.HasToken
+                ? $"{url}?access_token={Uri.EscapeDataString(Auth.Token!)}"
+                : url;
+        }
+    }
 
     private RenderFragment Field(string label, string? value) =>@<text>
         <dt class="col-sm-4 text-muted fw-normal">@label</dt>
