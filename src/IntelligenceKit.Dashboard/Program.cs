@@ -12,10 +12,26 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // self-hosted port so a fresh clone just works.
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:7099";
 
-builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
+// Holds the admin read-token (persisted in localStorage) and the 401 state.
+builder.Services.AddScoped<AuthState>();
+
+// Route the API HttpClient through the auth handler so every request carries the
+// bearer token and 401s bubble up as a re-auth prompt.
+builder.Services.AddScoped<AuthMessageHandler>();
+builder.Services.AddScoped(sp =>
+{
+    var authHandler = sp.GetRequiredService<AuthMessageHandler>();
+    authHandler.InnerHandler = new HttpClientHandler();
+    return new HttpClient(authHandler) { BaseAddress = new Uri(apiBaseUrl) };
+});
 builder.Services.AddScoped<ApiClient>();
 
-// Single shared live connection for real-time event push.
-builder.Services.AddSingleton<LiveEventsClient>();
+// Single shared live connection for real-time event push (one scope in WASM).
+builder.Services.AddScoped<LiveEventsClient>();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+// Restore a previously saved token before the first render or API call.
+await host.Services.GetRequiredService<AuthState>().InitializeAsync();
+
+await host.RunAsync();

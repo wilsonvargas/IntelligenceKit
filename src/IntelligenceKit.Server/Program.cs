@@ -1,9 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Models;
 using IntelligenceKit.Server;
+using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,9 +57,16 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 
+// Read-side auth: a single shared admin token gates every query endpoint and the
+// SignalR hub. Ingest (POST /events) stays open by design — the client's project
+// key is a public routing id, not a secret. See ReadTokenAuthHandler.
+builder.Services
+    .AddAuthentication(ReadTokenDefaults.Scheme)
+    .AddScheme<AuthenticationSchemeOptions, ReadTokenAuthHandler>(ReadTokenDefaults.Scheme, null);
+builder.Services.AddAuthorization();
+
 // The Blazor WASM dashboard is served from its own origin, so it needs CORS.
-// Read-only, no cookies/credentials — any origin may GET the API (and connect
-// to the SignalR hub, whose negotiate step is a CORS-checked request).
+// Auth is via bearer token (no cookies/credentials), so any origin may call.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(DashboardCors, policy =>
@@ -66,6 +76,8 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseCors(DashboardCors);
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Apply pending migrations on startup (creates the schema on first run).
 using (var scope = app.Services.CreateScope())
@@ -90,9 +102,12 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
     if (await db.Events.AnyAsync(e => e.Id == eventId))
         return Results.Ok(new { Id = eventId });
 
+    var fingerprint = EventFingerprint.Compute(intelligenceEvent);
+
     var stored = new StoredEvent
     {
         Id = eventId,
+        Fingerprint = fingerprint.Fingerprint,
         ProjectId = intelligenceEvent.ProjectId,
         ProjectKey = request.Headers["X-IntelligenceKit-Key"].ToString(),
         ApplicationName = intelligenceEvent.ApplicationName,
@@ -141,6 +156,48 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
         stored.Timestamp, stored.ReceivedAt);
     await hub.Clients.All.SendAsync("eventReceived", summary);
 
+    // Group the event into its issue: create it on first sighting, otherwise bump
+    // the count and move LastSeen forward.
+    var issue = await db.Issues
+        .FirstOrDefaultAsync(i => i.ProjectId == stored.ProjectId && i.Fingerprint == stored.Fingerprint);
+
+    if (issue is null)
+    {
+        issue = new Issue
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = stored.ProjectId,
+            Fingerprint = stored.Fingerprint,
+            Title = fingerprint.Title,
+            Culprit = fingerprint.Culprit,
+            EventType = stored.EventType,
+            Level = stored.Level,
+            EventCount = 1,
+            FirstSeen = stored.ReceivedAt,
+            LastSeen = stored.ReceivedAt,
+            LastEventId = stored.Id
+        };
+        db.Issues.Add(issue);
+    }
+    else
+    {
+        issue.EventCount += 1;
+        issue.LastSeen = stored.ReceivedAt;
+        issue.LastEventId = stored.Id;
+        issue.Level = stored.Level;
+        issue.Title = fingerprint.Title;
+        issue.Culprit = fingerprint.Culprit;
+    }
+
+    await db.SaveChangesAsync();
+
+    // Push the updated issue to any live dashboards (trend is recomputed on read).
+    var issueSummary = new IssueSummary(
+        issue.Id, issue.ProjectId, issue.Fingerprint, issue.Title, issue.Culprit,
+        issue.EventType, issue.Level, issue.EventCount,
+        issue.FirstSeen, issue.LastSeen, issue.LastEventId, 0, 0);
+    await hub.Clients.All.SendAsync("issueUpserted", issueSummary);
+
     return Results.Created($"/events/{stored.Id}", new { stored.Id });
 });
 
@@ -171,7 +228,7 @@ app.MapGet("/events", async (IntelligenceDbContext db, string? projectId, string
         .ToListAsync();
 
     return Results.Ok(new PagedResult<EventSummary>(total, skip, take, items));
-});
+}).RequireAuthorization();
 
 app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
 {
@@ -199,7 +256,7 @@ app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
         e.Timestamp, e.ReceivedAt);
 
     return Results.Ok(detail);
-});
+}).RequireAuthorization();
 
 // Screenshot blob for an event (the "last screen"). Uploaded separately from the
 // event so image bytes never ride inside the JSON payload.
@@ -244,7 +301,7 @@ app.MapGet("/events/{id:guid}/screenshot", async (Guid id, IntelligenceDbContext
 {
     var shot = await db.Screenshots.AsNoTracking().FirstOrDefaultAsync(s => s.EventId == id);
     return shot is null ? Results.NotFound() : Results.File(shot.Jpeg, shot.ContentType);
-});
+}).RequireAuthorization();
 
 app.MapGet("/projects", async (IntelligenceDbContext db) =>
 {
@@ -266,7 +323,7 @@ app.MapGet("/projects", async (IntelligenceDbContext db) =>
         .ToList();
 
     return Results.Ok(projects);
-});
+}).RequireAuthorization();
 
 // Events-per-hour time series for the dashboard chart. Buckets are filled with
 // zeros for quiet hours so the series is continuous. Grouping is done in memory
@@ -303,8 +360,102 @@ app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, string? pr
         buckets[i] = new TimeBucket(windowStart.AddHours(i), totals[i], exceptions[i]);
 
     return Results.Ok(buckets);
-});
+}).RequireAuthorization();
 
-app.MapHub<EventsHub>("/hubs/events");
+// Issues -----------------------------------------------------------------
+// Grouped problems: one row per (project, fingerprint), newest activity first.
+app.MapGet("/issues", async (IntelligenceDbContext db, string? projectId, int skip = 0, int take = 50) =>
+{
+    take = Math.Clamp(take, 1, 200);
+
+    var query = db.Issues.AsNoTracking().AsQueryable();
+    if (!string.IsNullOrWhiteSpace(projectId))
+        query = query.Where(i => i.ProjectId == projectId);
+
+    var total = await query.CountAsync();
+
+    var issues = await query
+        .OrderByDescending(i => i.LastSeen)
+        .Skip(skip)
+        .Take(take)
+        .ToListAsync();
+
+    // Trend: occurrences in the last hour vs the hour before, per fingerprint.
+    // Bounded to a 2-hour window and grouped in memory (small, provider-neutral).
+    var now = DateTime.UtcNow;
+    var recentStart = now.AddHours(-1);
+    var previousStart = now.AddHours(-2);
+
+    var trendQuery = db.Events.AsNoTracking().Where(e => e.ReceivedAt >= previousStart);
+    if (!string.IsNullOrWhiteSpace(projectId))
+        trendQuery = trendQuery.Where(e => e.ProjectId == projectId);
+
+    var trendRows = await trendQuery.Select(e => new { e.Fingerprint, e.ReceivedAt }).ToListAsync();
+
+    var recent = new Dictionary<string, int>();
+    var previous = new Dictionary<string, int>();
+    foreach (var r in trendRows)
+    {
+        var bucket = r.ReceivedAt >= recentStart ? recent : previous;
+        bucket[r.Fingerprint] = bucket.GetValueOrDefault(r.Fingerprint) + 1;
+    }
+
+    var items = issues.Select(i => new IssueSummary(
+        i.Id, i.ProjectId, i.Fingerprint, i.Title, i.Culprit, i.EventType, i.Level,
+        i.EventCount, i.FirstSeen, i.LastSeen, i.LastEventId,
+        recent.GetValueOrDefault(i.Fingerprint), previous.GetValueOrDefault(i.Fingerprint))).ToList();
+
+    return Results.Ok(new PagedResult<IssueSummary>(total, skip, take, items));
+}).RequireAuthorization();
+
+app.MapGet("/issues/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
+{
+    var i = await db.Issues.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+    if (i is null)
+        return Results.NotFound();
+
+    var now = DateTime.UtcNow;
+    var recentStart = now.AddHours(-1);
+    var previousStart = now.AddHours(-2);
+
+    var recent = await db.Events.AsNoTracking().CountAsync(e =>
+        e.ProjectId == i.ProjectId && e.Fingerprint == i.Fingerprint && e.ReceivedAt >= recentStart);
+    var previous = await db.Events.AsNoTracking().CountAsync(e =>
+        e.ProjectId == i.ProjectId && e.Fingerprint == i.Fingerprint &&
+        e.ReceivedAt >= previousStart && e.ReceivedAt < recentStart);
+
+    return Results.Ok(new IssueSummary(
+        i.Id, i.ProjectId, i.Fingerprint, i.Title, i.Culprit, i.EventType, i.Level,
+        i.EventCount, i.FirstSeen, i.LastSeen, i.LastEventId, recent, previous));
+}).RequireAuthorization();
+
+app.MapGet("/issues/{id:guid}/events", async (Guid id, IntelligenceDbContext db, int skip = 0, int take = 50) =>
+{
+    take = Math.Clamp(take, 1, 200);
+
+    var issue = await db.Issues.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+    if (issue is null)
+        return Results.NotFound();
+
+    var query = db.Events.AsNoTracking()
+        .Where(e => e.ProjectId == issue.ProjectId && e.Fingerprint == issue.Fingerprint);
+
+    var total = await query.CountAsync();
+
+    var items = await query
+        .OrderByDescending(e => e.ReceivedAt)
+        .Skip(skip)
+        .Take(take)
+        .Select(e => new EventSummary(
+            e.Id, e.ProjectId, e.ApplicationName, e.ApplicationVersion,
+            e.Environment, e.Platform, e.DeviceName, e.EventType,
+            e.Level, e.UserId,
+            e.ExceptionType, e.ExceptionMessage, e.Message, e.Timestamp, e.ReceivedAt))
+        .ToListAsync();
+
+    return Results.Ok(new PagedResult<EventSummary>(total, skip, take, items));
+}).RequireAuthorization();
+
+app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 
 app.Run();

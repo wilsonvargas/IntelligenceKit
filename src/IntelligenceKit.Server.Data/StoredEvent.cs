@@ -38,6 +38,9 @@ public class StoredEvent
 
     public string EventType { get; set; } = string.Empty;
 
+    /// <summary>Grouping key tying this event to its <see cref="Issue"/>.</summary>
+    public string Fingerprint { get; set; } = string.Empty;
+
     /// <summary>Severity for log events, e.g. "Error". Null for non-log events.</summary>
     public string? Level { get; set; }
 

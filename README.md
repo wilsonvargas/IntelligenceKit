@@ -4,6 +4,10 @@
 
 IntelligenceKit captures crashes, logs and rich runtime context from your app, ships them to a backend you control, and shows them on a real-time dashboard. Add one line to your MAUI app and it starts working — no per-capture-site code.
 
+![IntelligenceKit dashboard — live Overview](docs/images/overview.jpg)
+
+<p align="center"><em>The real-time Overview — KPI tiles, errors-per-hour, exception share and top issues. Dark theme by default, with a light toggle.</em></p>
+
 > **Status: early / pre-release (alpha).** The SDK and backend work end-to-end, but the API is still moving, NuGet packages are not published yet, and the read API/dashboard are currently unauthenticated (see [Security](#security)). Not production-ready. Feedback and contributions welcome.
 
 ---
@@ -28,8 +32,22 @@ The .NET/MAUI ecosystem lacks a lightweight, self-hostable crash + observability
 
 **Backend & dashboard**
 - 🗄️ **Persistent backend** on EF Core with **SQLite (default), PostgreSQL, or SQL Server** — selectable by config.
-- ⚡ **Real-time dashboard** (Blazor WebAssembly) — new events stream in live over SignalR, no refresh.
+- 🧩 **Issue grouping** — repeated crashes collapse into one issue by fingerprint (exception type + top frame), with occurrence counts, first/last seen and a rising/falling trend.
+- ⚡ **Real-time dashboard** (Blazor WebAssembly) — new events *and* issue updates stream in live over SignalR, no refresh.
 - 📈 **Errors-per-hour chart** and per-project overview.
+
+## Screenshots
+
+| Issues — grouped & trending | Event detail — the full story |
+| :---: | :---: |
+| [![Issues](docs/images/issues.jpg)](docs/images/issues.jpg) | [![Event detail](docs/images/event-detail.jpg)](docs/images/event-detail.jpg) |
+| Repeated crashes collapse into one issue with counts and a rising/falling trend. | Exception tree, device state at crash, breadcrumb trail, tags, and the last screen before it happened. |
+
+<p align="center">
+  <img src="docs/images/theme-light.jpg" alt="Light theme" width="49%" />
+  <img src="docs/images/theme-dark.jpg" alt="Dark theme" width="49%" />
+</p>
+<p align="center"><em>Dark by default; a one-click toggle for light.</em></p>
 
 ## Architecture
 
@@ -68,30 +86,57 @@ Everything targets **.NET 10**. The solution is `IntelligenceKit.slnx` (the XML 
 
 ## Quick start
 
-### 1. Run the backend
+**Prerequisites:** the [.NET 10 SDK](https://dotnet.microsoft.com/download), plus the MAUI workloads (`dotnet workload install maui`) if you're building the SDK/sample.
+
+The three pieces run independently. Start the **server** first (the dashboard and the app both talk to it).
+
+### 1. The server (ingest + query API)
 
 ```bash
 dotnet run --project src/IntelligenceKit.Server
-# listens on http://0.0.0.0:7099 (SQLite by default; schema auto-migrates on first run)
 ```
 
-### 2. Run the dashboard
+- Listens on **`http://0.0.0.0:7099`** (the `http` launch profile).
+- Uses **SQLite by default** and creates/migrates the schema on first run — zero setup.
+- To use PostgreSQL or SQL Server, or to protect the read API with a token, see [Configuration](#configuration) and [Security](#security).
+
+Verify it's up:
+
+```bash
+curl http://localhost:7099/projects      # → [] until events arrive
+```
+
+### 2. The dashboard (Blazor WebAssembly)
 
 ```bash
 dotnet run --project src/IntelligenceKit.Dashboard
-# http://localhost:5292 — point it at the API via wwwroot/appsettings.json ("ApiBaseUrl")
 ```
 
-### 3. Add the SDK to your MAUI app
+- Open the printed URL (e.g. **`http://localhost:5292`**).
+- It reads the API address from `src/IntelligenceKit.Dashboard/wwwroot/appsettings.json`:
 
-> NuGet packages are not published yet. For now, reference the projects directly
-> (`src/IntelligenceKit.Maui`) or build from source. The published flow will be:
->
-> ```bash
-> dotnet add package IntelligenceKit.Maui
-> ```
+  ```json
+  { "ApiBaseUrl": "http://localhost:7099" }
+  ```
 
-In `MauiProgram.cs`:
+- If the server has a read token configured, the dashboard prompts for it once and remembers it in the browser. With no token set, local (Development) runs are open.
+
+### 3. The SDK in your MAUI app
+
+**Install** — NuGet packages aren't published yet, so for now reference the project directly (or build from source):
+
+```xml
+<!-- in your .csproj -->
+<ProjectReference Include="path/to/src/IntelligenceKit.Maui/IntelligenceKit.Maui.csproj" />
+```
+
+Once published, the flow will simply be:
+
+```bash
+dotnet add package IntelligenceKit.Maui
+```
+
+**Wire it up** — a single line in `MauiProgram.cs`:
 
 ```csharp
 builder
@@ -99,17 +144,27 @@ builder
     .UseIntelligenceKit("http://demo-key@your-server:7099/my-project");
 ```
 
-That single call registers crash capture, offline storage, the uploader, context/breadcrumb tracking, and (opt-in) screen capture. Application name and version are auto-detected.
+That one call registers crash capture, the offline queue, the uploader, context/breadcrumb tracking, and (opt-in) screen capture. App name and version are auto-detected. The DSN format is explained in [Configuration](#dsn).
 
-**Using it in code:**
+> **Android emulator:** it can't reach your host via `localhost`. Use the special alias **`10.0.2.2`** to point at the server running on your machine:
+> `UseIntelligenceKit("http://demo-key@10.0.2.2:7099/my-project")`.
+
+**Use it in code** (`IIntelligenceKit` is injected via DI):
 
 ```csharp
-// Injected as IIntelligenceKit
-kit.SetUser("anon-123");                       // optional, anonymous
-kit.SetTag("tenant", "acme");
-kit.AddBreadcrumb("Tapped Checkout");
+kit.SetUser("anon-123");                       // optional, anonymous identifier
+kit.SetTag("plan", "premium");                 // arbitrary business context
+kit.AddBreadcrumb("Tapped Checkout");          // rides along with the next event
 await kit.TrackLogAsync(SeverityLevel.Warning, "Cart total mismatch");
-await kit.TrackExceptionAsync(ex);             // manual capture; crashes are automatic
+await kit.TrackExceptionAsync(ex);             // manual capture — crashes are automatic
+```
+
+### Try the whole thing end-to-end
+
+With the server running, launch the sample app (its DSN already points at `10.0.2.2:7099`), trigger a crash or log from its buttons, and watch it appear **live** in the dashboard:
+
+```bash
+dotnet build samples/Sample.Maui -t:Run -f net10.0-android
 ```
 
 ## Configuration
@@ -149,16 +204,26 @@ A schema change means regenerating the migration in all three provider projects.
 
 ## Security
 
-⚠️ **The read API and dashboard are currently unauthenticated** (CORS is open, no auth on queries). This is a known gap being addressed before a stable release — do not expose a self-hosted instance to the public internet with real data yet. Adding read-side auth is a priority item on the roadmap.
+The **read side** — every query endpoint plus the SignalR hub and the dashboard — is gated by a single shared admin token. Set it on the server:
+
+```jsonc
+// src/IntelligenceKit.Server/appsettings.json
+"Auth": { "ReadToken": "ik_admin_<a-long-random-string>" }
+```
+
+Callers present it as `Authorization: Bearer <token>` (the dashboard prompts for it once and stores it in the browser). Behaviour when the token is **not** set: reads are **open in Development** (zero-config local runs) and **locked in Production** (fail-closed), so a misconfigured deployment never serves data unprotected.
+
+**Ingest** (`POST /events`) is intentionally open: the client's project key is a public routing identifier that ships inside the app, not a secret — the same model Sentry uses.
+
+> Still evolving: there are no per-user accounts or per-project scoping yet (one shared token). Put the server behind TLS in production.
 
 ## Roadmap
 
-Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart.
+Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping**.
 
 Next:
-- [ ] LICENSE ✅ · README ✅ · **NuGet packaging** · **read-side auth** · **CI**
-- [ ] Webhook alerts (Slack/Discord/Teams)
-- [ ] Issue grouping (fingerprint → deduplicated issues with counts & trends)
+- [ ] **NuGet packaging** · **CI**
+- [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
 
 ## Building from source
