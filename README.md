@@ -2,13 +2,17 @@
 
 **Self-hosted observability & crash reporting for .NET and MAUI apps — a Sentry/Crashlytics alternative for the .NET ecosystem.**
 
+[![IntelligenceKit.Maui on NuGet](https://img.shields.io/nuget/vpre/IntelligenceKit.Maui?logo=nuget&label=IntelligenceKit.Maui)](https://www.nuget.org/packages/IntelligenceKit.Maui/)
+[![IntelligenceKit.Core on NuGet](https://img.shields.io/nuget/vpre/IntelligenceKit.Core?logo=nuget&label=IntelligenceKit.Core)](https://www.nuget.org/packages/IntelligenceKit.Core/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 IntelligenceKit captures crashes, logs and rich runtime context from your app, ships them to a backend you control, and shows them on a real-time dashboard. Add one line to your MAUI app and it starts working — no per-capture-site code.
 
 ![IntelligenceKit dashboard — live Overview](docs/images/overview.jpg)
 
 <p align="center"><em>The real-time Overview — KPI tiles, errors-per-hour, exception share and top issues. Dark theme by default, with a light toggle.</em></p>
 
-> **Status: early / pre-release (alpha).** The SDK and backend work end-to-end, but the API is still moving, NuGet packages are not published yet, and the read API/dashboard are currently unauthenticated (see [Security](#security)). Not production-ready. Feedback and contributions welcome.
+> **Status: early / pre-release (alpha).** The first packages are published to NuGet (`0.1.0-alpha`), but the API is still moving and the read API/dashboard are currently unauthenticated (see [Security](#security)). Not production-ready — expect breaking changes before `1.0.0`. Feedback and contributions welcome.
 
 ---
 
@@ -123,18 +127,13 @@ dotnet run --project src/IntelligenceKit.Dashboard
 
 ### 3. The SDK in your MAUI app
 
-**Install** — NuGet packages aren't published yet, so for now reference the project directly (or build from source):
-
-```xml
-<!-- in your .csproj -->
-<ProjectReference Include="path/to/src/IntelligenceKit.Maui/IntelligenceKit.Maui.csproj" />
-```
-
-Once published, the flow will simply be:
+**Install** — from NuGet ([IntelligenceKit.Maui](https://www.nuget.org/packages/IntelligenceKit.Maui/) pulls in [IntelligenceKit.Core](https://www.nuget.org/packages/IntelligenceKit.Core/) automatically):
 
 ```bash
-dotnet add package IntelligenceKit.Maui
+dotnet add package IntelligenceKit.Maui --prerelease
 ```
+
+> `--prerelease` is required while the packages are in `alpha`.
 
 **Wire it up** — a single line in `MauiProgram.cs`:
 
@@ -222,7 +221,8 @@ Callers present it as `Authorization: Bearer <token>` (the dashboard prompts for
 Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping**.
 
 Next:
-- [ ] **NuGet packaging** · **CI**
+- [x] **NuGet packaging** — `IntelligenceKit.Core` + `IntelligenceKit.Maui` published (alpha)
+- [ ] **CI**
 - [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
 
