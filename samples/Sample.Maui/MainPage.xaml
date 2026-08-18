@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Sample.Maui.MainPage">
+
+    <ScrollView>
+        <VerticalStackLayout
+            Padding="30,20"
+            Spacing="16">
+
+            <Label
+                Text="IntelligenceKit Demo"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1" />
+
+            <Label
+                Text="Prueba las rutas de captura y la cola offline."
+                Style="{StaticResource SubHeadline}" />
+
+            <Button
+                x:Name="TrackEventBtn"
+                Text="Enviar evento normal"
+                SemanticProperties.Hint="Envía un evento de tipo Log"
+                Clicked="OnTrackEventClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="TrackExceptionBtn"
+                Text="Enviar excepción controlada"
+                SemanticProperties.Hint="Captura una excepción con try/catch y la reporta"
+                Clicked="OnTrackExceptionClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="ShowQueueBtn"
+                Text="Ver cola offline"
+                SemanticProperties.Hint="Muestra cuántos eventos hay pendientes en SQLite"
+                Clicked="OnShowQueueClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="FlushBtn"
+                Text="Forzar envío (flush)"
+                SemanticProperties.Hint="Intenta drenar la cola offline hacia el servidor"
+                Clicked="OnFlushClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="GoSecondPageBtn"
+                Text="Ir a segunda pantalla"
+                SemanticProperties.Hint="Navega a otra pantalla para probar la captura"
+                Clicked="OnGoSecondPageClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="SetUserBtn"
+                Text="Identificar usuario"
+                SemanticProperties.Hint="Asocia los siguientes eventos a un usuario"
+                Clicked="OnSetUserClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="BreadcrumbBtn"
+                Text="Agregar breadcrumb"
+                SemanticProperties.Hint="Agrega una miga de pan al rastro local"
+                Clicked="OnAddBreadcrumbClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="LogBtn"
+                Text="Registrar log (warning)"
+                SemanticProperties.Hint="Envía un evento de log y deja breadcrumb"
+                Clicked="OnLogClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
+                x:Name="CrashBtn"
+                Text="Provocar crash no controlado"
+                SemanticProperties.Hint="Lanza una excepción no controlada"
+                Clicked="OnCrashClicked"
+                BackgroundColor="#B00020"
+                TextColor="White"
+                HorizontalOptions="Fill" />
+
+            <Label
+                x:Name="StatusLabel"
+                Text="Listo."
+                Margin="0,10,0,0"
+                LineBreakMode="WordWrap" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

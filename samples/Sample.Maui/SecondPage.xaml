@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Sample.Maui.SecondPage"
+             Title="Segunda pantalla">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="30,20" Spacing="16">
+
+            <Label
+                Text="Segunda pantalla"
+                Style="{StaticResource Headline}"
+                SemanticProperties.HeadingLevel="Level1" />
+
+            <Label
+                Text="Esta pantalla debería quedar capturada. Lanza una excepción controlada y revisa el screenshot en el dashboard."
+                Style="{StaticResource SubHeadline}" />
+
+            <Button
+                x:Name="SecondPageExceptionBtn"
+                Text="Enviar excepción desde esta pantalla"
+                Clicked="OnSecondPageExceptionClicked"
+                HorizontalOptions="Fill" />
+
+            <Label
+                x:Name="StatusLabel"
+                Text="Listo."
+                Margin="0,10,0,0"
+                LineBreakMode="WordWrap" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

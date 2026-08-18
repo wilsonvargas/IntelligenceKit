@@ -427,3 +427,23 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ---------------------------------------------------------------------------
+# IntelligenceKit project-specific
+# ---------------------------------------------------------------------------
+
+# Internal working docs (not part of the published OSS project)
+CLAUDE.md
+IntelligenceKit_Context.md
+
+# Claude Code local settings
+.claude/
+
+# Graphify generated knowledge-graph output
+graphify-out/
+
+# Runtime SQLite databases (server default + EF design-time + MAUI on-device)
+*.db
+*.db3
+*.db-shm
+*.db-wal

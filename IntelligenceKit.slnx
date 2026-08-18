@@ -1,0 +1,14 @@
+<Solution>
+  <Project Path="src/IntelligenceKit.Core/IntelligenceKit.Core.csproj" />
+  <Project Path="src/IntelligenceKit.Dashboard/IntelligenceKit.Dashboard.csproj" />
+  <Project Path="src/IntelligenceKit.Maui/IntelligenceKit.Maui.csproj" Id="a9410bf5-a045-4059-ad0d-5be38508283e" />
+  <Project Path="src/IntelligenceKit.Server.Contracts/IntelligenceKit.Server.Contracts.csproj" />
+  <Project Path="src/IntelligenceKit.Server.Data/IntelligenceKit.Server.Data.csproj" />
+  <Project Path="src/IntelligenceKit.Server.Migrations.PostgreSql/IntelligenceKit.Server.Migrations.PostgreSql.csproj" />
+  <Project Path="src/IntelligenceKit.Server.Migrations.Sqlite/IntelligenceKit.Server.Migrations.Sqlite.csproj" />
+  <Project Path="src/IntelligenceKit.Server.Migrations.SqlServer/IntelligenceKit.Server.Migrations.SqlServer.csproj" />
+  <Project Path="src/IntelligenceKit.Server/IntelligenceKit.Server.csproj" />
+  <Project Path="samples/Sample.Maui/Sample.Maui.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+</Solution>
