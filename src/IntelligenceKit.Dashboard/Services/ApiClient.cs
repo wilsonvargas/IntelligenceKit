@@ -63,4 +63,31 @@ public class ApiClient(HttpClient http)
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<EventDetail>(JsonOptions, ct);
     }
+
+    public async Task<PagedResult<IssueSummary>> GetIssuesAsync(
+        string? projectId = null, int skip = 0, int take = 50, CancellationToken ct = default)
+    {
+        var url = $"/issues?skip={skip}&take={take}";
+        if (!string.IsNullOrWhiteSpace(projectId))
+            url += $"&projectId={Uri.EscapeDataString(projectId)}";
+
+        return await http.GetFromJsonAsync<PagedResult<IssueSummary>>(url, JsonOptions, ct)
+               ?? new PagedResult<IssueSummary>(0, skip, take, Array.Empty<IssueSummary>());
+    }
+
+    public async Task<IssueSummary?> GetIssueAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await http.GetAsync($"/issues/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IssueSummary>(JsonOptions, ct);
+    }
+
+    public async Task<PagedResult<EventSummary>> GetIssueEventsAsync(
+        Guid id, int skip = 0, int take = 50, CancellationToken ct = default)
+        => await http.GetFromJsonAsync<PagedResult<EventSummary>>(
+               $"/issues/{id}/events?skip={skip}&take={take}", JsonOptions, ct)
+           ?? new PagedResult<EventSummary>(0, skip, take, Array.Empty<EventSummary>());
 }

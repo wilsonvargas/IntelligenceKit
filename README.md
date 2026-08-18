@@ -28,7 +28,8 @@ The .NET/MAUI ecosystem lacks a lightweight, self-hostable crash + observability
 
 **Backend & dashboard**
 - 🗄️ **Persistent backend** on EF Core with **SQLite (default), PostgreSQL, or SQL Server** — selectable by config.
-- ⚡ **Real-time dashboard** (Blazor WebAssembly) — new events stream in live over SignalR, no refresh.
+- 🧩 **Issue grouping** — repeated crashes collapse into one issue by fingerprint (exception type + top frame), with occurrence counts, first/last seen and a rising/falling trend.
+- ⚡ **Real-time dashboard** (Blazor WebAssembly) — new events *and* issue updates stream in live over SignalR, no refresh.
 - 📈 **Errors-per-hour chart** and per-project overview.
 
 ## Architecture
@@ -164,13 +165,11 @@ Callers present it as `Authorization: Bearer <token>` (the dashboard prompts for
 
 ## Roadmap
 
-Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart.
+Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping**.
 
 Next:
-- [x] LICENSE · README · **read-side auth** (shared admin token)
 - [ ] **NuGet packaging** · **CI**
-- [ ] Webhook alerts (Slack/Discord/Teams)
-- [ ] Issue grouping (fingerprint → deduplicated issues with counts & trends)
+- [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
 
 ## Building from source

@@ -17,6 +17,56 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.Issue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Culprit")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("EventCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("FirstSeen")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("LastEventId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("LastSeen")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Level")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Fingerprint")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectId", "LastSeen");
+
+                    b.ToTable("Issues");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.StoredEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -65,6 +115,10 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                     b.Property<string>("ExceptionType")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Level")
                         .HasColumnType("TEXT");
 
@@ -110,6 +164,8 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EventType");
+
+                    b.HasIndex("ProjectId", "Fingerprint");
 
                     b.HasIndex("ProjectId", "ReceivedAt");
 
