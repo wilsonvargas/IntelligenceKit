@@ -25,6 +25,9 @@ public sealed class LiveEventsClient : IAsyncDisposable
     /// <summary>Raised on the SignalR thread; handlers should marshal to the UI.</summary>
     public event Action<EventSummary>? EventReceived;
 
+    /// <summary>Raised when an issue is created or its count changes.</summary>
+    public event Action<IssueSummary>? IssueUpserted;
+
     public HubConnectionState State => _connection?.State ?? HubConnectionState.Disconnected;
 
     /// <summary>Connects if not already connected. Safe to call repeatedly.</summary>
@@ -44,6 +47,7 @@ public sealed class LiveEventsClient : IAsyncDisposable
             .Build();
 
         _connection.On<EventSummary>("eventReceived", summary => EventReceived?.Invoke(summary));
+        _connection.On<IssueSummary>("issueUpserted", issue => IssueUpserted?.Invoke(issue));
 
         await _connection.StartAsync();
     }

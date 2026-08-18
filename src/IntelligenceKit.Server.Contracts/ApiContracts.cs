@@ -27,6 +27,26 @@ public record EventSummary(
 /// <summary>One hour of the events-per-hour time series.</summary>
 public record TimeBucket(DateTime Start, int Total, int Exceptions);
 
+/// <summary>
+/// A grouped problem for the Issues view. <c>RecentCount</c>/<c>PreviousCount</c>
+/// are occurrences in the last hour vs the hour before, so the client can draw a
+/// trend arrow.
+/// </summary>
+public record IssueSummary(
+    Guid Id,
+    string ProjectId,
+    string Fingerprint,
+    string Title,
+    string? Culprit,
+    string EventType,
+    string? Level,
+    long EventCount,
+    DateTime FirstSeen,
+    DateTime LastSeen,
+    Guid LastEventId,
+    int RecentCount,
+    int PreviousCount);
+
 /// <summary>Per-project rollup for the projects overview.</summary>
 public record ProjectSummary(
     string ProjectId,

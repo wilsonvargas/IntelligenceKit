@@ -22,6 +22,56 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.Issue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Culprit")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("EventCount")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("FirstSeen")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("LastEventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("LastSeen")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Level")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Fingerprint")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectId", "LastSeen");
+
+                    b.ToTable("Issues");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.StoredEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -70,6 +120,10 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                     b.Property<string>("ExceptionType")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Level")
                         .HasColumnType("nvarchar(max)");
 
@@ -115,6 +169,8 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EventType");
+
+                    b.HasIndex("ProjectId", "Fingerprint");
 
                     b.HasIndex("ProjectId", "ReceivedAt");
 
