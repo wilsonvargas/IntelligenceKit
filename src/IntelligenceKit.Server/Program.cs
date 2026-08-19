@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -7,6 +8,7 @@ using IntelligenceKit.Server;
 using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
+using IntelligenceKit.Server.Projects;
 using IntelligenceKit.Server.Retention;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
@@ -15,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 
 const string DashboardCors = "dashboard";
 const string IngestRateLimit = "ingest";
+const string AdminOnly = "admin-only";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,7 +76,12 @@ builder.Services.AddHostedService<RetentionService>();
 builder.Services
     .AddAuthentication(ReadTokenDefaults.Scheme)
     .AddScheme<AuthenticationSchemeOptions, ReadTokenAuthHandler>(ReadTokenDefaults.Scheme, null);
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Project management is admin-only; a project-scoped read key can't manage tenants.
+    options.AddPolicy(AdminOnly, policy =>
+        policy.RequireClaim(ReadTokenDefaults.RoleClaim, ReadTokenDefaults.RoleAdmin));
+});
 
 // The Blazor WASM dashboard is served from its own origin, so it needs CORS.
 // Auth is via bearer token (no cookies/credentials), so any origin may call.
@@ -138,9 +146,20 @@ if (app.Environment.IsDevelopment())
 }
 
 // Ingest -----------------------------------------------------------------
-app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest request, IntelligenceDbContext db, IHubContext<EventsHub> hub) =>
+app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest request, IntelligenceDbContext db, IHubContext<EventsHub> hub, IConfiguration config) =>
 {
     var eventId = intelligenceEvent.Id == Guid.Empty ? Guid.NewGuid() : intelligenceEvent.Id;
+
+    // Reject events for unknown projects: the (projectId, projectKey) pair from the
+    // DSN must match a registered project. Opt-out via Ingest:RequireKnownProject.
+    if (config.GetValue("Ingest:RequireKnownProject", true))
+    {
+        var projectKey = request.Headers["X-IntelligenceKit-Key"].ToString();
+        var known = await db.Projects.AsNoTracking().AnyAsync(p =>
+            p.ProjectId == intelligenceEvent.ProjectId && p.ProjectKey == projectKey);
+        if (!known)
+            return Results.NotFound(new { error = "Unknown project. Register it via POST /admin/projects." });
+    }
 
     // Idempotent ingest: a client may re-send an already-delivered event while
     // retrying its screenshot upload. Treat a duplicate as success, don't insert
@@ -200,7 +219,8 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
         stored.Level, stored.UserId,
         stored.ExceptionType, stored.ExceptionMessage, stored.Message,
         stored.Timestamp, stored.ReceivedAt);
-    await hub.Clients.All.SendAsync("eventReceived", summary);
+    // Only admins and dashboards scoped to this project receive the push.
+    await hub.Clients.Groups("admins", $"project:{stored.ProjectId}").SendAsync("eventReceived", summary);
 
     // Group the event into its issue: create it on first sighting, otherwise bump
     // the count and move LastSeen forward.
@@ -242,20 +262,22 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
         issue.Id, issue.ProjectId, issue.Fingerprint, issue.Title, issue.Culprit,
         issue.EventType, issue.Level, issue.EventCount,
         issue.FirstSeen, issue.LastSeen, issue.LastEventId, 0, 0);
-    await hub.Clients.All.SendAsync("issueUpserted", issueSummary);
+    await hub.Clients.Groups("admins", $"project:{issue.ProjectId}").SendAsync("issueUpserted", issueSummary);
 
     return Results.Created($"/events/{stored.Id}", new { stored.Id });
 }).RequireRateLimiting(IngestRateLimit);
 
 // Query ------------------------------------------------------------------
-app.MapGet("/events", async (IntelligenceDbContext db, string? projectId, string? eventType, int skip = 0, int take = 50) =>
+app.MapGet("/events", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, string? eventType, int skip = 0, int take = 50) =>
 {
     take = Math.Clamp(take, 1, 200);
 
     var query = db.Events.AsNoTracking().AsQueryable();
 
-    if (!string.IsNullOrWhiteSpace(projectId))
-        query = query.Where(e => e.ProjectId == projectId);
+    // A scoped caller is pinned to its own project; the query param can't widen it.
+    var projectFilter = user.ProjectScope() ?? projectId;
+    if (!string.IsNullOrWhiteSpace(projectFilter))
+        query = query.Where(e => e.ProjectId == projectFilter);
 
     if (!string.IsNullOrWhiteSpace(eventType))
         query = query.Where(e => e.EventType == eventType);
@@ -276,10 +298,16 @@ app.MapGet("/events", async (IntelligenceDbContext db, string? projectId, string
     return Results.Ok(new PagedResult<EventSummary>(total, skip, take, items));
 }).RequireAuthorization();
 
-app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
+app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db, ClaimsPrincipal user) =>
 {
     var e = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
     if (e is null)
+        return Results.NotFound();
+
+    // Don't leak another project's event to a scoped caller (404, not 403, so the
+    // event's existence isn't disclosed).
+    var scope = user.ProjectScope();
+    if (scope is not null && e.ProjectId != scope)
         return Results.NotFound();
 
     var hasScreenshot = await db.Screenshots.AsNoTracking().AnyAsync(s => s.EventId == id);
@@ -343,18 +371,32 @@ app.MapPost("/events/{id:guid}/screenshot", async (Guid id, HttpRequest request,
     return Results.Ok(new { id });
 }).RequireRateLimiting(IngestRateLimit);
 
-app.MapGet("/events/{id:guid}/screenshot", async (Guid id, IntelligenceDbContext db) =>
+app.MapGet("/events/{id:guid}/screenshot", async (Guid id, IntelligenceDbContext db, ClaimsPrincipal user) =>
 {
+    var scope = user.ProjectScope();
+    if (scope is not null)
+    {
+        var proj = await db.Events.AsNoTracking()
+            .Where(e => e.Id == id).Select(e => e.ProjectId).FirstOrDefaultAsync();
+        if (proj != scope)
+            return Results.NotFound();
+    }
+
     var shot = await db.Screenshots.AsNoTracking().FirstOrDefaultAsync(s => s.EventId == id);
     return shot is null ? Results.NotFound() : Results.File(shot.Jpeg, shot.ContentType);
 }).RequireAuthorization();
 
-app.MapGet("/projects", async (IntelligenceDbContext db) =>
+app.MapGet("/projects", async (IntelligenceDbContext db, ClaimsPrincipal user) =>
 {
     // Pull only the columns needed and group in memory: the SQLite provider
     // doesn't translate this GroupBy-with-filtered-count shape, and the
     // projected set is small (project id / type / timestamp).
-    var rows = await db.Events.AsNoTracking()
+    var baseQuery = db.Events.AsNoTracking().AsQueryable();
+    var scope = user.ProjectScope();
+    if (scope is not null)
+        baseQuery = baseQuery.Where(e => e.ProjectId == scope);
+
+    var rows = await baseQuery
         .Select(e => new { e.ProjectId, e.EventType, e.ReceivedAt })
         .ToListAsync();
 
@@ -374,7 +416,7 @@ app.MapGet("/projects", async (IntelligenceDbContext db) =>
 // Events-per-hour time series for the dashboard chart. Buckets are filled with
 // zeros for quiet hours so the series is continuous. Grouping is done in memory
 // (the window is bounded, and it avoids provider-specific date functions).
-app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, string? projectId, int hours = 24) =>
+app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, int hours = 24) =>
 {
     hours = Math.Clamp(hours, 1, 168);
 
@@ -383,8 +425,9 @@ app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, string? pr
     var windowStart = currentHour.AddHours(-(hours - 1));
 
     var query = db.Events.AsNoTracking().Where(e => e.ReceivedAt >= windowStart);
-    if (!string.IsNullOrWhiteSpace(projectId))
-        query = query.Where(e => e.ProjectId == projectId);
+    var projectFilter = user.ProjectScope() ?? projectId;
+    if (!string.IsNullOrWhiteSpace(projectFilter))
+        query = query.Where(e => e.ProjectId == projectFilter);
 
     var rows = await query.Select(e => new { e.ReceivedAt, e.EventType }).ToListAsync();
 
@@ -410,13 +453,15 @@ app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, string? pr
 
 // Issues -----------------------------------------------------------------
 // Grouped problems: one row per (project, fingerprint), newest activity first.
-app.MapGet("/issues", async (IntelligenceDbContext db, string? projectId, int skip = 0, int take = 50) =>
+app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, int skip = 0, int take = 50) =>
 {
     take = Math.Clamp(take, 1, 200);
 
+    var projectFilter = user.ProjectScope() ?? projectId;
+
     var query = db.Issues.AsNoTracking().AsQueryable();
-    if (!string.IsNullOrWhiteSpace(projectId))
-        query = query.Where(i => i.ProjectId == projectId);
+    if (!string.IsNullOrWhiteSpace(projectFilter))
+        query = query.Where(i => i.ProjectId == projectFilter);
 
     var total = await query.CountAsync();
 
@@ -433,8 +478,8 @@ app.MapGet("/issues", async (IntelligenceDbContext db, string? projectId, int sk
     var previousStart = now.AddHours(-2);
 
     var trendQuery = db.Events.AsNoTracking().Where(e => e.ReceivedAt >= previousStart);
-    if (!string.IsNullOrWhiteSpace(projectId))
-        trendQuery = trendQuery.Where(e => e.ProjectId == projectId);
+    if (!string.IsNullOrWhiteSpace(projectFilter))
+        trendQuery = trendQuery.Where(e => e.ProjectId == projectFilter);
 
     var trendRows = await trendQuery.Select(e => new { e.Fingerprint, e.ReceivedAt }).ToListAsync();
 
@@ -454,10 +499,14 @@ app.MapGet("/issues", async (IntelligenceDbContext db, string? projectId, int sk
     return Results.Ok(new PagedResult<IssueSummary>(total, skip, take, items));
 }).RequireAuthorization();
 
-app.MapGet("/issues/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
+app.MapGet("/issues/{id:guid}", async (Guid id, IntelligenceDbContext db, ClaimsPrincipal user) =>
 {
     var i = await db.Issues.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
     if (i is null)
+        return Results.NotFound();
+
+    var scope = user.ProjectScope();
+    if (scope is not null && i.ProjectId != scope)
         return Results.NotFound();
 
     var now = DateTime.UtcNow;
@@ -475,12 +524,16 @@ app.MapGet("/issues/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
         i.EventCount, i.FirstSeen, i.LastSeen, i.LastEventId, recent, previous));
 }).RequireAuthorization();
 
-app.MapGet("/issues/{id:guid}/events", async (Guid id, IntelligenceDbContext db, int skip = 0, int take = 50) =>
+app.MapGet("/issues/{id:guid}/events", async (Guid id, IntelligenceDbContext db, ClaimsPrincipal user, int skip = 0, int take = 50) =>
 {
     take = Math.Clamp(take, 1, 200);
 
     var issue = await db.Issues.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
     if (issue is null)
+        return Results.NotFound();
+
+    var scope = user.ProjectScope();
+    if (scope is not null && issue.ProjectId != scope)
         return Results.NotFound();
 
     var query = db.Events.AsNoTracking()
@@ -501,6 +554,69 @@ app.MapGet("/issues/{id:guid}/events", async (Guid id, IntelligenceDbContext db,
 
     return Results.Ok(new PagedResult<EventSummary>(total, skip, take, items));
 }).RequireAuthorization();
+
+// Project administration (tenants) --------------------------------------
+// Admin-only: create/list/rotate/delete projects. Creating or rotating returns
+// the read key ONCE (only its hash is stored).
+app.MapPost("/admin/projects", async (CreateProjectRequest req, IntelligenceDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(req.ProjectId))
+        return Results.BadRequest("projectId is required.");
+
+    if (await db.Projects.AnyAsync(p => p.ProjectId == req.ProjectId))
+        return Results.Conflict($"Project '{req.ProjectId}' already exists.");
+
+    var readKey = ProjectKeys.NewReadKey();
+    var project = new Project
+    {
+        Id = Guid.NewGuid(),
+        ProjectId = req.ProjectId,
+        ProjectKey = string.IsNullOrWhiteSpace(req.ProjectKey) ? ProjectKeys.NewProjectKey() : req.ProjectKey!,
+        Name = req.Name ?? string.Empty,
+        ReadKeyHash = ProjectKeys.Hash(readKey),
+        CreatedAt = DateTime.UtcNow,
+    };
+
+    db.Projects.Add(project);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/admin/projects/{project.Id}", new ProjectCredentials(
+        project.Id, project.ProjectId, project.ProjectKey, project.Name, project.CreatedAt, readKey));
+}).RequireAuthorization(AdminOnly);
+
+app.MapGet("/admin/projects", async (IntelligenceDbContext db) =>
+{
+    var projects = await db.Projects.AsNoTracking()
+        .OrderBy(p => p.ProjectId)
+        .Select(p => new ProjectInfo(p.Id, p.ProjectId, p.ProjectKey, p.Name, p.CreatedAt))
+        .ToListAsync();
+    return Results.Ok(projects);
+}).RequireAuthorization(AdminOnly);
+
+app.MapPost("/admin/projects/{id:guid}/rotate-key", async (Guid id, IntelligenceDbContext db) =>
+{
+    var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
+    if (project is null)
+        return Results.NotFound();
+
+    var readKey = ProjectKeys.NewReadKey();
+    project.ReadKeyHash = ProjectKeys.Hash(readKey);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new ProjectCredentials(
+        project.Id, project.ProjectId, project.ProjectKey, project.Name, project.CreatedAt, readKey));
+}).RequireAuthorization(AdminOnly);
+
+app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
+{
+    var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
+    if (project is null)
+        return Results.NotFound();
+
+    db.Projects.Remove(project);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization(AdminOnly);
 
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 

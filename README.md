@@ -230,15 +230,34 @@ The **read side** — every query endpoint plus the SignalR hub and the dashboar
 "Auth": { "ReadToken": "ik_admin_<a-long-random-string>" }
 ```
 
-Callers present it as `Authorization: Bearer <token>` (the dashboard prompts for it once and stores it in the browser). Behaviour when the token is **not** set: reads are **open in Development** (zero-config local runs) and **locked in Production** (fail-closed), so a misconfigured deployment never serves data unprotected.
+The admin token sees **every** project. Present it as `Authorization: Bearer <token>` (the dashboard prompts for it once and stores it in the browser). Behaviour when the token is **not** set: reads are **open in Development** (zero-config local runs) and **locked in Production** (fail-closed), so a misconfigured deployment never serves data unprotected.
 
-**Ingest** (`POST /events`) is intentionally open: the client's project key is a public routing identifier that ships inside the app, not a secret — the same model Sentry uses. Because it's open, the ingest endpoints are **rate-limited per client IP** (fixed window, `300` requests / `60s` by default) to blunt floods; a throttled caller gets `429` + `Retry-After`, and the SDK's store-and-forward retries those events later, so none are lost. Tune or disable it under `RateLimit:Ingest` in `appsettings.json` (raise `PermitLimit` for clients behind shared NAT). Behind a reverse proxy, forward the real client IP so the limit partitions correctly.
+### Per-project scoping (multi-tenant)
 
-> Still evolving: there are no per-user accounts or per-project scoping yet (one shared token). Put the server behind TLS in production.
+Beyond the global admin token, each project can have its **own read key** that sees **only that project's** data — so you can host one server for several teams without each seeing the others' crashes. Manage projects through the admin-only API (gated by the admin token):
+
+```bash
+# create a project → returns its read key ONCE (only a hash is stored) + a public ingest key
+curl -X POST http://localhost:7099/admin/projects \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{ "projectId": "team-a", "name": "Team A" }'
+# GET /admin/projects · POST /admin/projects/{id}/rotate-key · DELETE /admin/projects/{id}
+```
+
+A project read key is presented the same way (`Authorization: Bearer <read-key>`); every read endpoint and the SignalR hub then filter to that project, and a `?projectId=` for anyone else's project is ignored (cross-project access returns `404`). A production server can run **project-scoped only** — no global admin token required (though you'll need one to manage projects).
+
+### Ingest
+
+**Ingest** (`POST /events`) is unauthenticated by design: the client's project key is a public routing identifier that ships inside the app, not a secret — the same model Sentry uses. Two guards apply:
+
+- **Known-project validation** — by default the server only accepts events whose `(projectId, projectKey)` pair matches a registered project (unknown → `404`). Turn it off with `Ingest:RequireKnownProject: false` to keep ingest fully open.
+- **Rate limiting** — per client IP (fixed window, `300` requests / `60s` by default). A throttled caller gets `429` + `Retry-After`, and the SDK's store-and-forward retries those events later, so none are lost. Tune under `RateLimit:Ingest` (raise `PermitLimit` for clients behind shared NAT); behind a reverse proxy, forward the real client IP so the limit partitions correctly.
+
+> Put the server behind TLS in production. There are no per-user accounts yet — access is by admin token or per-project read key.
 
 ## Roadmap
 
-Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping**.
+Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping** · ingest rate limiting · data retention · **per-project scoping (multi-tenant)**.
 
 Next:
 - [x] **NuGet packaging** — `IntelligenceKit.Core` + `IntelligenceKit.Maui` published (alpha)

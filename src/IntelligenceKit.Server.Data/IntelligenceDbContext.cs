@@ -15,6 +15,8 @@ public class IntelligenceDbContext : DbContext
 
     public DbSet<Issue> Issues => Set<Issue>();
 
+    public DbSet<Project> Projects => Set<Project>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var stored = modelBuilder.Entity<StoredEvent>();
@@ -33,5 +35,14 @@ public class IntelligenceDbContext : DbContext
         // One issue per (project, fingerprint); also the upsert lookup path.
         issue.HasIndex(i => new { i.ProjectId, i.Fingerprint }).IsUnique();
         issue.HasIndex(i => new { i.ProjectId, i.LastSeen });
+
+        var project = modelBuilder.Entity<Project>();
+        project.HasKey(p => p.Id);
+        // ProjectId is the public routing id — one project per id.
+        project.HasIndex(p => p.ProjectId).IsUnique();
+        // Read-side auth resolves a presented key to a project by its hash.
+        project.HasIndex(p => p.ReadKeyHash);
+        // Ingest validates the (ProjectId, ProjectKey) pair.
+        project.HasIndex(p => new { p.ProjectId, p.ProjectKey });
     }
 }
