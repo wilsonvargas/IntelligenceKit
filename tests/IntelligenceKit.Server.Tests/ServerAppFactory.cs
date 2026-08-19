@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using IntelligenceKit.Server.Data;
+using IntelligenceKit.Server.Retention;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -24,10 +25,11 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     private readonly string _environment;
     private readonly bool _withToken;
     private readonly IReadOnlyDictionary<string, string?>? _extraSettings;
+    private readonly bool _disableHostedServices;
 
     // xUnit's IClassFixture requires exactly one public constructor; it yields the
     // default configuration (Development + a configured read token). Other
-    // configurations are created explicitly via Create(...).
+    // configurations are created explicitly via the Create* factory methods.
     public ServerAppFactory() : this("Development", withToken: true)
     {
     }
@@ -35,11 +37,13 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     private ServerAppFactory(
         string environment,
         bool withToken,
-        IReadOnlyDictionary<string, string?>? extraSettings = null)
+        IReadOnlyDictionary<string, string?>? extraSettings = null,
+        bool disableHostedServices = false)
     {
         _environment = environment;
         _withToken = withToken;
         _extraSettings = extraSettings;
+        _disableHostedServices = disableHostedServices;
         _connection.Open();
     }
 
@@ -47,6 +51,25 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     /// for tests that exercise the fail-open vs fail-closed auth matrix.</summary>
     public static ServerAppFactory Create(string environment, bool withToken)
         => new(environment, withToken);
+
+    /// <summary>A factory with retention enabled at <paramref name="days"/> and the
+    /// timed background sweeper removed, so tests drive <see cref="RetentionSweeper"/>
+    /// deterministically instead of racing the hosted service.</summary>
+    public static ServerAppFactory CreateWithRetention(int days)
+        => new("Development", withToken: true,
+            new Dictionary<string, string?>
+            {
+                ["Retention:Enabled"] = "true",
+                ["Retention:Days"] = days.ToString(),
+            },
+            disableHostedServices: true);
+
+    /// <summary>A factory with retention explicitly disabled (and the background
+    /// sweeper removed), for asserting the no-op path.</summary>
+    public static ServerAppFactory CreateWithRetentionDisabled()
+        => new("Development", withToken: true,
+            new Dictionary<string, string?> { ["Retention:Enabled"] = "false" },
+            disableHostedServices: true);
 
     /// <summary>A factory with a tiny ingest rate limit, for exercising 429s
     /// without having to fire hundreds of requests.</summary>
@@ -100,6 +123,11 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
                 options.UseSqlite(
                     _connection,
                     x => x.MigrationsAssembly("IntelligenceKit.Server.Migrations.Sqlite")));
+
+            // Drop background hosted services (the retention sweeper) so tests can
+            // drive their logic directly without a timer racing them.
+            if (_disableHostedServices)
+                RemoveAll(services, typeof(IHostedService));
         });
     }
 

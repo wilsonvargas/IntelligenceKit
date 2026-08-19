@@ -7,6 +7,7 @@ using IntelligenceKit.Server;
 using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
+using IntelligenceKit.Server.Retention;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
@@ -59,6 +60,12 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+
+// Data retention: a background service prunes events/screenshots/issues older
+// than Retention:Days on a Retention:SweepHours cadence. Off by default (opt in
+// via Retention:Enabled). The sweeper is scoped (it needs the DbContext).
+builder.Services.AddScoped<RetentionSweeper>();
+builder.Services.AddHostedService<RetentionService>();
 
 // Read-side auth: a single shared admin token gates every query endpoint and the
 // SignalR hub. Ingest (POST /events) stays open by design — the client's project
