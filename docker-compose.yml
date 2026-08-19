@@ -1,0 +1,59 @@
+# IntelligenceKit — full self-hosted stack: PostgreSQL + ingest/query server +
+# dashboard. Copy .env.example to .env (at minimum set IK_READ_TOKEN), then:
+#
+#   docker compose up --build
+#
+# Dashboard:  http://localhost:${DASHBOARD_PORT:-8080}
+# API:        http://localhost:${SERVER_PORT:-7099}
+name: intelligencekit
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-intelligencekit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intelligencekit}
+      POSTGRES_DB: ${POSTGRES_DB:-intelligencekit}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-intelligencekit} -d ${POSTGRES_DB:-intelligencekit}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # __ maps to the ASP.NET config hierarchy (Database:Provider, etc.).
+      Database__Provider: PostgreSql
+      ConnectionStrings__Events: "Host=db;Port=5432;Database=${POSTGRES_DB:-intelligencekit};Username=${POSTGRES_USER:-intelligencekit};Password=${POSTGRES_PASSWORD:-intelligencekit}"
+      # Required in Production: the read API/dashboard fail closed without it.
+      Auth__ReadToken: ${IK_READ_TOKEN:?set IK_READ_TOKEN in your .env}
+    ports:
+      - "${SERVER_PORT:-7099}:7099"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard.Dockerfile
+    environment:
+      # The browser reaches the API directly (the dashboard is WASM), so this is
+      # a host-reachable URL, NOT the "server" compose service name.
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:7099}
+    ports:
+      - "${DASHBOARD_PORT:-8080}:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  pgdata:

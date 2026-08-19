@@ -1,0 +1,16 @@
+# Normalize line endings. Default: let Git handle text automatically.
+* text=auto
+
+# Files consumed inside Linux containers MUST stay LF, or a Windows checkout
+# (core.autocrlf=true) would give them CRLF and break the shebang / parsing.
+*.sh          text eol=lf
+*.conf        text eol=lf
+*.Dockerfile  text eol=lf
+Dockerfile    text eol=lf
+docker-compose*.yml text eol=lf
+
+# Binary assets Git must never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
