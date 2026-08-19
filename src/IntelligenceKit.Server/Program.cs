@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Models;
 using IntelligenceKit.Server;
@@ -8,10 +9,12 @@ using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
 using IntelligenceKit.Server.Retention;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 const string DashboardCors = "dashboard";
+const string IngestRateLimit = "ingest";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -80,9 +83,45 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 
+// Ingest is unauthenticated by design, so it gets a per-client-IP rate limit to
+// blunt floods/abuse. Only the POST ingest endpoints opt in (via
+// RequireRateLimiting); the token-gated read side is left untouched. Config:
+// RateLimit:Ingest:{Enabled,PermitLimit,WindowSeconds,QueueLimit} is read per
+// request (so it can be overridden without a rebuild). A throttled client gets
+// 429 + Retry-After; the SDK's store-and-forward defers those events (429 is
+// treated as transient), so nothing is lost.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = (context, _) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString();
+        return ValueTask.CompletedTask;
+    };
+
+    options.AddPolicy(IngestRateLimit, httpContext =>
+    {
+        var config = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+        if (!config.GetValue("RateLimit:Ingest:Enabled", true))
+            return RateLimitPartition.GetNoLimiter("disabled");
+
+        var clientKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = config.GetValue("RateLimit:Ingest:PermitLimit", 300),
+            Window = TimeSpan.FromSeconds(config.GetValue("RateLimit:Ingest:WindowSeconds", 60)),
+            QueueLimit = config.GetValue("RateLimit:Ingest:QueueLimit", 0),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        });
+    });
+});
+
 var app = builder.Build();
 
 app.UseCors(DashboardCors);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -206,7 +245,7 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
     await hub.Clients.All.SendAsync("issueUpserted", issueSummary);
 
     return Results.Created($"/events/{stored.Id}", new { stored.Id });
-});
+}).RequireRateLimiting(IngestRateLimit);
 
 // Query ------------------------------------------------------------------
 app.MapGet("/events", async (IntelligenceDbContext db, string? projectId, string? eventType, int skip = 0, int take = 50) =>
@@ -302,7 +341,7 @@ app.MapPost("/events/{id:guid}/screenshot", async (Guid id, HttpRequest request,
 
     await db.SaveChangesAsync();
     return Results.Ok(new { id });
-});
+}).RequireRateLimiting(IngestRateLimit);
 
 app.MapGet("/events/{id:guid}/screenshot", async (Guid id, IntelligenceDbContext db) =>
 {

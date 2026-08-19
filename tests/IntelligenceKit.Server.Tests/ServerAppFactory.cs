@@ -71,6 +71,23 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
             new Dictionary<string, string?> { ["Retention:Enabled"] = "false" },
             disableHostedServices: true);
 
+    /// <summary>A factory with a tiny ingest rate limit, for exercising 429s
+    /// without having to fire hundreds of requests.</summary>
+    public static ServerAppFactory CreateWithIngestLimit(int permitLimit, int windowSeconds)
+        => new("Development", withToken: true, new Dictionary<string, string?>
+        {
+            ["RateLimit:Ingest:Enabled"] = "true",
+            ["RateLimit:Ingest:PermitLimit"] = permitLimit.ToString(),
+            ["RateLimit:Ingest:WindowSeconds"] = windowSeconds.ToString(),
+        });
+
+    /// <summary>A factory with ingest rate limiting turned off.</summary>
+    public static ServerAppFactory CreateWithIngestLimitDisabled()
+        => new("Development", withToken: true, new Dictionary<string, string?>
+        {
+            ["RateLimit:Ingest:Enabled"] = "false",
+        });
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environment);
