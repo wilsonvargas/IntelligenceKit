@@ -72,7 +72,7 @@ Every event flows through a single funnel (`IntelligenceKitService.Enrich()` →
 ```
 src/        Product code (the library + backend + dashboard)
 samples/    Sample.Maui — a demo app that consumes the SDK
-tests/      IntelligenceKit.Core.Tests — unit tests for the framework-agnostic core
+tests/      Core.Tests (unit) + Server.Tests (integration, WebApplicationFactory)
 ```
 
 Everything targets **.NET 10**. The solution is `IntelligenceKit.slnx` (the XML solution format).

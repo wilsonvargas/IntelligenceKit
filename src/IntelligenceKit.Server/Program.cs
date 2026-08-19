@@ -459,3 +459,8 @@ app.MapGet("/issues/{id:guid}/events", async (Guid id, IntelligenceDbContext db,
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 
 app.Run();
+
+// Exposed so the integration test project can host the app via
+// WebApplicationFactory<Program>. Top-level programs otherwise emit an internal
+// Program class the test assembly can't reference.
+public partial class Program { }
