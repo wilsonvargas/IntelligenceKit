@@ -54,6 +54,29 @@ public record ProjectSummary(
     int ExceptionCount,
     DateTime LastEventAt);
 
+/// <summary>Body for creating a project. ProjectKey is optional — generated when omitted.</summary>
+public record CreateProjectRequest(string ProjectId, string Name, string? ProjectKey);
+
+/// <summary>A registered project as returned by the admin API (never includes the read key).</summary>
+public record ProjectInfo(
+    Guid Id,
+    string ProjectId,
+    string ProjectKey,
+    string Name,
+    DateTime CreatedAt);
+
+/// <summary>
+/// Returned once when a project is created or its key is rotated — the only time
+/// the plaintext <c>ReadKey</c> is ever exposed (only its hash is stored).
+/// </summary>
+public record ProjectCredentials(
+    Guid Id,
+    string ProjectId,
+    string ProjectKey,
+    string Name,
+    DateTime CreatedAt,
+    string ReadKey);
+
 /// <summary>Full event, with the exception tree, context and trail already parsed.</summary>
 public record EventDetail(
     Guid Id,

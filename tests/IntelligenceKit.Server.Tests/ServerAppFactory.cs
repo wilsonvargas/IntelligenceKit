@@ -88,6 +88,14 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
             ["RateLimit:Ingest:Enabled"] = "false",
         });
 
+    /// <summary>A factory that enforces project registration on ingest, for the
+    /// unknown-project rejection tests.</summary>
+    public static ServerAppFactory CreateWithIngestValidation()
+        => new("Development", withToken: true, new Dictionary<string, string?>
+        {
+            ["Ingest:RequireKnownProject"] = "true",
+        });
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environment);
@@ -97,6 +105,9 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
             var settings = new Dictionary<string, string?>
             {
                 ["Database:Provider"] = "Sqlite",
+                // Existing tests post events without registering projects, so ingest
+                // validation is off by default here; the validation tests re-enable it.
+                ["Ingest:RequireKnownProject"] = "false",
             };
             if (_withToken)
                 settings["Auth:ReadToken"] = TestToken;
@@ -141,11 +152,13 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>An HttpClient carrying the admin read token (passes read-side auth).</summary>
-    public HttpClient CreateAuthorizedClient()
+    public HttpClient CreateAuthorizedClient() => CreateClientWithToken(TestToken);
+
+    /// <summary>An HttpClient carrying an arbitrary bearer token (e.g. a project read key).</summary>
+    public HttpClient CreateClientWithToken(string token)
     {
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestToken);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 

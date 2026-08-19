@@ -72,6 +72,43 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                     b.ToTable("Issues");
                 });
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProjectKey")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ReadKeyHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique();
+
+                    b.HasIndex("ReadKeyHash");
+
+                    b.HasIndex("ProjectId", "ProjectKey");
+
+                    b.ToTable("Projects");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.StoredEvent", b =>
                 {
                     b.Property<Guid>("Id")
