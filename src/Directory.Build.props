@@ -17,6 +17,7 @@
     <RepositoryUrl>https://github.com/wilsonvargas/IntelligenceKit</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>observability;crash-reporting;logging;diagnostics;telemetry;maui;dotnet;sentry-alternative</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
 
     <!-- Not packable unless a project opts in. -->
     <IsPackable>false</IsPackable>
@@ -26,5 +27,14 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
+
+  <!--
+    Ship the shared package icon (docs/images/icon.png, resolved relative to this
+    file's src/ directory). Unconditional by design: the Pack metadata only takes
+    effect when a project actually packs, so non-packable projects ignore it.
+  -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\docs\images\icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 
 </Project>
