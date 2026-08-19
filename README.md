@@ -2,8 +2,8 @@
 
 **Self-hosted observability & crash reporting for .NET and MAUI apps — a Sentry/Crashlytics alternative for the .NET ecosystem.**
 
-[![IntelligenceKit.Maui on NuGet](https://img.shields.io/nuget/vpre/IntelligenceKit.Maui?logo=nuget&label=IntelligenceKit.Maui)](https://www.nuget.org/packages/IntelligenceKit.Maui/)
-[![IntelligenceKit.Core on NuGet](https://img.shields.io/nuget/vpre/IntelligenceKit.Core?logo=nuget&label=IntelligenceKit.Core)](https://www.nuget.org/packages/IntelligenceKit.Core/)
+[![IntelligenceKit.Maui on NuGet](https://img.shields.io/nuget/v/IntelligenceKit.Maui?logo=nuget&label=IntelligenceKit.Maui)](https://www.nuget.org/packages/IntelligenceKit.Maui/)
+[![IntelligenceKit.Core on NuGet](https://img.shields.io/nuget/v/IntelligenceKit.Core?logo=nuget&label=IntelligenceKit.Core)](https://www.nuget.org/packages/IntelligenceKit.Core/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 IntelligenceKit captures crashes, logs and rich runtime context from your app, ships them to a backend you control, and shows them on a real-time dashboard. Add one line to your MAUI app and it starts working — no per-capture-site code.
@@ -12,7 +12,7 @@ IntelligenceKit captures crashes, logs and rich runtime context from your app, s
 
 <p align="center"><em>The real-time Overview — KPI tiles, errors-per-hour, exception share and top issues. Dark theme by default, with a light toggle.</em></p>
 
-> **Status: early / pre-release (alpha).** The first packages are published to NuGet (`0.1.0-alpha`), but the API is still moving and the read API/dashboard are currently unauthenticated (see [Security](#security)). Not production-ready — expect breaking changes before `1.0.0`. Feedback and contributions welcome.
+> **Status: stable (`1.0.0`).** The public SDK API is frozen under [Semantic Versioning](#versioning-and-api-stability); the read side is authenticated (admin token or per-project read key) and the stack is self-hostable via Docker. See the [CHANGELOG](CHANGELOG.md) for what shipped. Feedback and contributions welcome.
 
 ---
 
@@ -132,10 +132,8 @@ dotnet run --project src/IntelligenceKit.Dashboard
 **Install** — from NuGet ([IntelligenceKit.Maui](https://www.nuget.org/packages/IntelligenceKit.Maui/) pulls in [IntelligenceKit.Core](https://www.nuget.org/packages/IntelligenceKit.Core/) automatically):
 
 ```bash
-dotnet add package IntelligenceKit.Maui --prerelease
+dotnet add package IntelligenceKit.Maui
 ```
-
-> `--prerelease` is required while the packages are in `alpha`.
 
 **Wire it up** — a single line in `MauiProgram.cs`:
 
@@ -259,12 +257,26 @@ A project read key is presented the same way (`Authorization: Bearer <read-key>`
 
 Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping** · ingest rate limiting · data retention · **per-project scoping (multi-tenant)**.
 
-Next:
-- [x] **NuGet packaging** — `IntelligenceKit.Core` + `IntelligenceKit.Maui` published (alpha)
-- [x] **CI** — GitHub Actions builds the backend + dashboard and runs the core test suite on every push/PR
-- [x] **Test coverage** — Core unit tests and Server integration tests (ingest idempotency, issue grouping, read-side auth, enum-over-the-wire, screenshots)
+Shipped in `1.0.0`: NuGet packaging · CI · full test suite (Core + Server integration) · Docker Compose stack · ingest rate limiting · data retention · per-project scoping.
+
+After 1.0 (1.x):
+- [ ] Native iOS `NSException` handler (current capture is managed-exception only)
+- [ ] Issue backfill (grouping is forward-only today)
+- [ ] Project management UI in the dashboard (today it's the admin API)
 - [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
+
+## Versioning and API stability
+
+IntelligenceKit follows [Semantic Versioning](https://semver.org/). As of `1.0.0`
+the **public API of the `IntelligenceKit.Core` and `IntelligenceKit.Maui` NuGet
+packages** is stable: no breaking changes without a major (`2.0.0`) bump. That
+covers `UseIntelligenceKit`, `IIntelligenceKit`, `IntelligenceOptions`, the domain
+model and the public abstractions.
+
+Not covered by the SemVer guarantee (may change in a minor release): the server's
+HTTP endpoints and database schema, the dashboard, and the DSN/wire format — though
+these are treated with care and documented in the [CHANGELOG](CHANGELOG.md).
 
 ## Building from source
 
