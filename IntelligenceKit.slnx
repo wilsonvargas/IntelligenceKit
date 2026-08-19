@@ -12,4 +12,5 @@
     <Deploy Solution="Debug|*" />
   </Project>
   <Project Path="tests/IntelligenceKit.Core.Tests/IntelligenceKit.Core.Tests.csproj" />
+  <Project Path="tests/IntelligenceKit.Server.Tests/IntelligenceKit.Server.Tests.csproj" />
 </Solution>
