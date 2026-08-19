@@ -30,6 +30,7 @@ jobs:
           dotnet restore src/IntelligenceKit.Server/IntelligenceKit.Server.csproj
           dotnet restore src/IntelligenceKit.Dashboard/IntelligenceKit.Dashboard.csproj
           dotnet restore tests/IntelligenceKit.Core.Tests/IntelligenceKit.Core.Tests.csproj
+          dotnet restore tests/IntelligenceKit.Server.Tests/IntelligenceKit.Server.Tests.csproj
 
       - name: Build server
         run: dotnet build src/IntelligenceKit.Server/IntelligenceKit.Server.csproj --configuration Release --no-restore
@@ -37,11 +38,18 @@ jobs:
       - name: Build dashboard
         run: dotnet build src/IntelligenceKit.Dashboard/IntelligenceKit.Dashboard.csproj --configuration Release --no-restore
 
-      - name: Test
+      - name: Test (Core)
         run: >
           dotnet test tests/IntelligenceKit.Core.Tests/IntelligenceKit.Core.Tests.csproj
           --configuration Release
-          --logger "trx;LogFileName=test-results.trx"
+          --logger "trx;LogFileName=core-test-results.trx"
+          --results-directory ./TestResults
+
+      - name: Test (Server integration)
+        run: >
+          dotnet test tests/IntelligenceKit.Server.Tests/IntelligenceKit.Server.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=server-test-results.trx"
           --results-directory ./TestResults
 
       - name: Upload test results
