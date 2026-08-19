@@ -90,6 +90,19 @@ Everything targets **.NET 10**. The solution is `IntelligenceKit.slnx` (the XML 
 
 ## Quick start
 
+### Run the whole stack with Docker (recommended)
+
+The fastest path — PostgreSQL + server + dashboard in a single command:
+
+```bash
+cp .env.example .env      # then set IK_READ_TOKEN to a long random value
+docker compose up --build
+```
+
+Dashboard on **http://localhost:8080**, API on **http://localhost:7099**. The server runs against PostgreSQL and applies its schema automatically. See [docker/README.md](docker/README.md) for configuration (ports, credentials, pointing the dashboard at a remote API).
+
+### Run from source
+
 **Prerequisites:** the [.NET 10 SDK](https://dotnet.microsoft.com/download), plus the MAUI workloads (`dotnet workload install maui`) if you're building the SDK/sample.
 
 The three pieces run independently. Start the **server** first (the dashboard and the app both talk to it).
