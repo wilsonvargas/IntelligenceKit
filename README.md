@@ -28,17 +28,17 @@ The .NET/MAUI ecosystem lacks a lightweight, self-hostable crash + observability
 ## Features
 
 **Client SDK (MAUI)**
-- 🧨 **Crash reporting** on Android & iOS with a typed, nested `ExceptionInfo` (inner-exception chain preserved).
-- 📴 **Offline store-and-forward** — events persist to a local SQLite queue first, then upload; nothing is lost if the app crashes or is offline. The queue drains on next launch and when connectivity returns.
-- 🧭 **Rich context** — breadcrumbs ("what led here"), a device runtime snapshot (memory, battery, network, current screen), plus `Environment`, `Release`, `User` (anonymous, opt-in), `Tags` and severity levels.
-- 🖼️ **Last-screen capture** (opt-in) — a downscaled JPEG of the screen before the crash, captured proactively and stored apart from the event payload. Privacy-first: off by default, per-page exclusion list, no full-res images.
-- 📊 **Logs** — `TrackLogAsync(level, message, data)` doubles as a breadcrumb.
+- **Crash reporting** on Android & iOS with a typed, nested `ExceptionInfo` (inner-exception chain preserved).
+- **Offline store-and-forward** — events persist to a local SQLite queue first, then upload; nothing is lost if the app crashes or is offline. The queue drains on next launch and when connectivity returns.
+- **Rich context** — breadcrumbs ("what led here"), a device runtime snapshot (memory, battery, network, current screen), plus `Environment`, `Release`, `User` (anonymous, opt-in), `Tags` and severity levels.
+- **Last-screen capture** (opt-in) — a downscaled JPEG of the screen before the crash, captured proactively and stored apart from the event payload. Privacy-first: off by default, per-page exclusion list, no full-res images.
+- **Logs** — `TrackLogAsync(level, message, data)` doubles as a breadcrumb.
 
 **Backend & dashboard**
-- 🗄️ **Persistent backend** on EF Core with **SQLite (default), PostgreSQL, or SQL Server** — selectable by config.
-- 🧩 **Issue grouping** — repeated crashes collapse into one issue by fingerprint (exception type + top frame), with occurrence counts, first/last seen and a rising/falling trend.
-- ⚡ **Real-time dashboard** (Blazor WebAssembly) — new events *and* issue updates stream in live over SignalR, no refresh.
-- 📈 **Errors-per-hour chart** and per-project overview.
+- **Persistent backend** on EF Core with **SQLite (default), PostgreSQL, or SQL Server** — selectable by config.
+- **Issue grouping** — repeated crashes collapse into one issue by fingerprint (exception type + top frame), with occurrence counts, first/last seen and a rising/falling trend.
+- **Real-time dashboard** (Blazor WebAssembly) — new events *and* issue updates stream in live over SignalR, no refresh.
+- **Errors-per-hour chart** and per-project overview.
 
 ## Screenshots
 
@@ -55,18 +55,7 @@ The .NET/MAUI ecosystem lacks a lightweight, self-hostable crash + observability
 
 ## Architecture
 
-```
- ┌──────────────┐     HTTP POST /events        ┌────────────────────────┐
- │  MAUI app    │ ───────────────────────────► │  IntelligenceKit.Server │
- │  + SDK       │     (+ screenshot blob)       │  (Minimal API + EF Core)│
- └──────────────┘                               └───────────┬────────────┘
-        ▲                                                    │ SignalR
-        │ store-and-forward (offline SQLite queue)           ▼
-        │                                        ┌────────────────────────┐
-        └── crash / log / context                │  Dashboard (Blazor WASM)│
-                                                  │  live feed + charts     │
-                                                  └────────────────────────┘
-```
+![IntelligenceKit architecture](docs/images/architecture.png)
 
 Dependency direction (nothing depends on MAUI except the MAUI SDK):
 
@@ -223,7 +212,7 @@ Done: crash reporting (Android/iOS) · offline store-and-forward · background u
 Next:
 - [x] **NuGet packaging** — `IntelligenceKit.Core` + `IntelligenceKit.Maui` published (alpha)
 - [x] **CI** — GitHub Actions builds the backend + dashboard and runs the core test suite on every push/PR
-- [ ] **Test coverage** — core unit tests landed; server integration tests next
+- [x] **Test coverage** — Core unit tests and Server integration tests (ingest idempotency, issue grouping, read-side auth, enum-over-the-wire, screenshots)
 - [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
 
