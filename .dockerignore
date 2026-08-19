@@ -1,0 +1,21 @@
+# Build artifacts (never ship host-built binaries into the image)
+**/bin
+**/obj
+
+# VCS / tooling
+.git
+.github
+.vs
+.vscode
+*.user
+
+# Not needed to build the server or dashboard images
+tests
+samples
+docs
+graphify-out
+artifacts
+
+# Local env / compose overrides
+.env
+docker-compose.override.yml
