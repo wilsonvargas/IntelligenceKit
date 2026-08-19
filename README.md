@@ -1,10 +1,16 @@
-# IntelligenceKit
+<p align="center">
+  <img src="docs/images/icon.png" alt="IntelligenceKit" width="128" height="128" />
+</p>
 
-**Self-hosted observability & crash reporting for .NET and MAUI apps — a Sentry/Crashlytics alternative for the .NET ecosystem.**
+<h1 align="center">IntelligenceKit</h1>
 
-[![IntelligenceKit.Maui on NuGet](https://img.shields.io/nuget/v/IntelligenceKit.Maui?logo=nuget&label=IntelligenceKit.Maui)](https://www.nuget.org/packages/IntelligenceKit.Maui/)
-[![IntelligenceKit.Core on NuGet](https://img.shields.io/nuget/v/IntelligenceKit.Core?logo=nuget&label=IntelligenceKit.Core)](https://www.nuget.org/packages/IntelligenceKit.Core/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<p align="center"><strong>Self-hosted observability &amp; crash reporting for .NET and MAUI apps — a Sentry/Crashlytics alternative for the .NET ecosystem.</strong></p>
+
+<p align="center">
+  <a href="https://www.nuget.org/packages/IntelligenceKit.Maui/"><img src="https://img.shields.io/nuget/v/IntelligenceKit.Maui?logo=nuget&label=IntelligenceKit.Maui" alt="IntelligenceKit.Maui on NuGet" /></a>
+  <a href="https://www.nuget.org/packages/IntelligenceKit.Core/"><img src="https://img.shields.io/nuget/v/IntelligenceKit.Core?logo=nuget&label=IntelligenceKit.Core" alt="IntelligenceKit.Core on NuGet" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+</p>
 
 IntelligenceKit captures crashes, logs and rich runtime context from your app, ships them to a backend you control, and shows them on a real-time dashboard. Add one line to your MAUI app and it starts working — no per-capture-site code.
 
