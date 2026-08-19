@@ -50,10 +50,14 @@ public class IntelligenceDsnTests
     }
 
     [Theory]
-    [InlineData("not-a-uri")]          // no scheme → not an absolute URI
-    [InlineData("/just/a/path")]       // relative → not an absolute URI
+    [InlineData("not-a-uri")]                 // no scheme → not an absolute URI
+    [InlineData("has spaces and no scheme")]  // whitespace + no scheme → not an absolute URI
     public void Parse_ThrowsFormatException_OnMalformedDsn(string dsn)
     {
+        // NOTE: a bare leading-slash path (e.g. "/just/a/path") is intentionally
+        // NOT tested here — .NET on Unix treats it as a valid absolute (file) URI,
+        // so it does not throw, unlike on Windows. Keep cases that are invalid
+        // absolute URIs on every platform.
         Assert.Throws<FormatException>(() => IntelligenceDsn.Parse(dsn));
     }
 
