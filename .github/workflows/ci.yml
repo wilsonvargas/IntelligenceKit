@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    name: Build & test (non-MAUI)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # The MAUI projects (IntelligenceKit.Maui, Sample.Maui) need platform
+      # workloads/SDKs and are intentionally excluded here — CI validates the
+      # framework-agnostic core, the backend, the dashboard and the test suite.
+      # Building the Server transitively builds Core, Server.Contracts,
+      # Server.Data and all three Server.Migrations.* provider assemblies.
+      - name: Restore
+        run: |
+          dotnet restore src/IntelligenceKit.Server/IntelligenceKit.Server.csproj
+          dotnet restore src/IntelligenceKit.Dashboard/IntelligenceKit.Dashboard.csproj
+          dotnet restore tests/IntelligenceKit.Core.Tests/IntelligenceKit.Core.Tests.csproj
+
+      - name: Build server
+        run: dotnet build src/IntelligenceKit.Server/IntelligenceKit.Server.csproj --configuration Release --no-restore
+
+      - name: Build dashboard
+        run: dotnet build src/IntelligenceKit.Dashboard/IntelligenceKit.Dashboard.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test tests/IntelligenceKit.Core.Tests/IntelligenceKit.Core.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./TestResults/*.trx
+          if-no-files-found: ignore
