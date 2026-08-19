@@ -35,7 +35,7 @@ public class HttpIntelligenceClient : IIntelligenceClient
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
 
-            return Classify(response.StatusCode);
+            return HttpStatusClassifier.Classify((int)response.StatusCode);
         }
         catch (Exception)
         {
@@ -61,24 +61,11 @@ public class HttpIntelligenceClient : IIntelligenceClient
                 request.Headers.Add("X-IntelligenceKit-Key", _options.ProjectKey);
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
-            return Classify(response.StatusCode);
+            return HttpStatusClassifier.Classify((int)response.StatusCode);
         }
         catch (Exception)
         {
             return SendResult.TransientFailure;
         }
-    }
-
-    private static SendResult Classify(System.Net.HttpStatusCode statusCode)
-    {
-        if ((int)statusCode is >= 200 and < 300)
-            return SendResult.Delivered;
-
-        // 4xx = the server rejected this; retrying won't change that.
-        if ((int)statusCode is >= 400 and < 500)
-            return SendResult.Rejected;
-
-        // 5xx and anything else: transient, worth retrying.
-        return SendResult.TransientFailure;
     }
 }

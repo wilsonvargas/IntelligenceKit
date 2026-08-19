@@ -214,7 +214,7 @@ The **read side** — every query endpoint plus the SignalR hub and the dashboar
 
 Callers present it as `Authorization: Bearer <token>` (the dashboard prompts for it once and stores it in the browser). Behaviour when the token is **not** set: reads are **open in Development** (zero-config local runs) and **locked in Production** (fail-closed), so a misconfigured deployment never serves data unprotected.
 
-**Ingest** (`POST /events`) is intentionally open: the client's project key is a public routing identifier that ships inside the app, not a secret — the same model Sentry uses.
+**Ingest** (`POST /events`) is intentionally open: the client's project key is a public routing identifier that ships inside the app, not a secret — the same model Sentry uses. Because it's open, the ingest endpoints are **rate-limited per client IP** (fixed window, `300` requests / `60s` by default) to blunt floods; a throttled caller gets `429` + `Retry-After`, and the SDK's store-and-forward retries those events later, so none are lost. Tune or disable it under `RateLimit:Ingest` in `appsettings.json` (raise `PermitLimit` for clients behind shared NAT). Behind a reverse proxy, forward the real client IP so the limit partitions correctly.
 
 > Still evolving: there are no per-user accounts or per-project scoping yet (one shared token). Put the server behind TLS in production.
 

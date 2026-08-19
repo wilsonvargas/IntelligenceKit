@@ -23,6 +23,7 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
     private readonly string _environment;
     private readonly bool _withToken;
+    private readonly IReadOnlyDictionary<string, string?>? _extraSettings;
 
     // xUnit's IClassFixture requires exactly one public constructor; it yields the
     // default configuration (Development + a configured read token). Other
@@ -31,10 +32,14 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     {
     }
 
-    private ServerAppFactory(string environment, bool withToken)
+    private ServerAppFactory(
+        string environment,
+        bool withToken,
+        IReadOnlyDictionary<string, string?>? extraSettings = null)
     {
         _environment = environment;
         _withToken = withToken;
+        _extraSettings = extraSettings;
         _connection.Open();
     }
 
@@ -42,6 +47,23 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     /// for tests that exercise the fail-open vs fail-closed auth matrix.</summary>
     public static ServerAppFactory Create(string environment, bool withToken)
         => new(environment, withToken);
+
+    /// <summary>A factory with a tiny ingest rate limit, for exercising 429s
+    /// without having to fire hundreds of requests.</summary>
+    public static ServerAppFactory CreateWithIngestLimit(int permitLimit, int windowSeconds)
+        => new("Development", withToken: true, new Dictionary<string, string?>
+        {
+            ["RateLimit:Ingest:Enabled"] = "true",
+            ["RateLimit:Ingest:PermitLimit"] = permitLimit.ToString(),
+            ["RateLimit:Ingest:WindowSeconds"] = windowSeconds.ToString(),
+        });
+
+    /// <summary>A factory with ingest rate limiting turned off.</summary>
+    public static ServerAppFactory CreateWithIngestLimitDisabled()
+        => new("Development", withToken: true, new Dictionary<string, string?>
+        {
+            ["RateLimit:Ingest:Enabled"] = "false",
+        });
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -55,6 +77,12 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
             };
             if (_withToken)
                 settings["Auth:ReadToken"] = TestToken;
+
+            if (_extraSettings is not null)
+            {
+                foreach (var kv in _extraSettings)
+                    settings[kv.Key] = kv.Value;
+            }
 
             // Added last, so it wins over the app's appsettings.json.
             config.AddInMemoryCollection(settings);
