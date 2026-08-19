@@ -83,7 +83,7 @@ Every event flows through a single funnel (`IntelligenceKitService.Enrich()` →
 ```
 src/        Product code (the library + backend + dashboard)
 samples/    Sample.Maui — a demo app that consumes the SDK
-tests/      (reserved)
+tests/      IntelligenceKit.Core.Tests — unit tests for the framework-agnostic core
 ```
 
 Everything targets **.NET 10**. The solution is `IntelligenceKit.slnx` (the XML solution format).
@@ -222,7 +222,8 @@ Done: crash reporting (Android/iOS) · offline store-and-forward · background u
 
 Next:
 - [x] **NuGet packaging** — `IntelligenceKit.Core` + `IntelligenceKit.Maui` published (alpha)
-- [ ] **CI**
+- [x] **CI** — GitHub Actions builds the backend + dashboard and runs the core test suite on every push/PR
+- [ ] **Test coverage** — core unit tests landed; server integration tests next
 - [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
 

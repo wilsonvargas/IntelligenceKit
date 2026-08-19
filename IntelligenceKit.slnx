@@ -11,4 +11,5 @@
   <Project Path="samples/Sample.Maui/Sample.Maui.csproj">
     <Deploy Solution="Debug|*" />
   </Project>
+  <Project Path="tests/IntelligenceKit.Core.Tests/IntelligenceKit.Core.Tests.csproj" />
 </Solution>
