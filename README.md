@@ -203,6 +203,24 @@ dotnet ef migrations add <Name> \
 
 A schema change means regenerating the migration in all three provider projects.
 
+### Data retention (server)
+
+A background sweep can prune old data so a self-hosted database doesn't grow
+without bound. It's **off by default** — opt in:
+
+```jsonc
+"Retention": {
+  "Enabled": true,      // off by default; a fresh install never deletes data
+  "Days": 90,           // delete events/screenshots older than this (by ReceivedAt),
+                        // and issues with no activity since (by LastSeen). Must be > 0.
+  "SweepHours": 6       // how often the sweep runs
+}
+```
+
+The sweep runs at startup and every `SweepHours` thereafter; each pass is a
+single set-based delete per table (works on all three providers). With
+`Enabled: false` (or `Days <= 0`) it does nothing.
+
 ## Security
 
 The **read side** — every query endpoint plus the SignalR hub and the dashboard — is gated by a single shared admin token. Set it on the server:
