@@ -50,6 +50,7 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\IntelligenceKit.Core\IntelligenceKit.Core.csproj" />
+	  <ProjectReference Include="..\IntelligenceKit.Extensions.Logging\IntelligenceKit.Extensions.Logging.csproj" />
 	</ItemGroup>
 
 </Project>

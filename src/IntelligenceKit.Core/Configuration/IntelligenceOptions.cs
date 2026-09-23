@@ -78,6 +78,13 @@ public class IntelligenceOptions
     public TimeSpan AnrThreshold { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Platform SDKs that host Microsoft.Extensions.Logging (e.g. MAUI) register the
+    /// IntelligenceKit logger provider automatically: Information+ logs become
+    /// breadcrumbs and Error+ logs become events.
+    /// </summary>
+    public bool EnableLoggingIntegration { get; set; } = true;
+
+    /// <summary>
     /// Measure app start, page load and (with the HTTP handler) request durations,
     /// and ship them as batched performance spans.
     /// </summary>

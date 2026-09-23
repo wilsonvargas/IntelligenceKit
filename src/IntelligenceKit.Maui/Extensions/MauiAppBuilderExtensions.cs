@@ -3,6 +3,7 @@ using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Providers;
 using IntelligenceKit.Core.Services;
 using IntelligenceKit.Core.Storage;
+using IntelligenceKit.Extensions.Logging;
 using IntelligenceKit.Maui.CrashReporting;
 using IntelligenceKit.Maui.Diagnostics;
 using IntelligenceKit.Maui.Providers;
@@ -45,6 +46,10 @@ public static class MauiAppBuilderExtensions
         builder.Services.AddSingleton<IInstallationIdProvider, MauiInstallationIdProvider>();
         if (options.EnableAutoSessionTracking)
             builder.Services.AddSingleton<ISessionTracker, SessionTracker>();
+
+        // ILogger integration: logs become breadcrumbs (Information+) and events (Error+).
+        if (options.EnableLoggingIntegration)
+            builder.Logging.AddIntelligenceKit();
 
         // Performance: app start / page load timing, plus HTTP spans for clients that
         // opt in via AddIntelligenceKitHandler().

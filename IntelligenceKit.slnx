@@ -8,6 +8,9 @@
   <Project Path="src/IntelligenceKit.Server.Migrations.Sqlite/IntelligenceKit.Server.Migrations.Sqlite.csproj" />
   <Project Path="src/IntelligenceKit.Server.Migrations.SqlServer/IntelligenceKit.Server.Migrations.SqlServer.csproj" />
   <Project Path="src/IntelligenceKit.Server/IntelligenceKit.Server.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/IntelligenceKit.Extensions.Logging/IntelligenceKit.Extensions.Logging.csproj" />
+  </Folder>
   <Project Path="samples/Sample.Maui/Sample.Maui.csproj">
     <Deploy Solution="Debug|*" />
   </Project>
