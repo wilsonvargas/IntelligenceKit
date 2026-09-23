@@ -106,6 +106,18 @@ public static class MauiAppBuilderExtensions
         events.AddiOS(ios => ios
             .WillEnterForeground(application => OnForeground())
             .DidEnterBackground(application => OnBackground()));
+#elif WINDOWS
+        // Desktop has no background state; a minimized/hidden window is the
+        // closest equivalent, and closing the window ends the run.
+        events.AddWindows(windows => windows
+            .OnVisibilityChanged((window, args) =>
+            {
+                if (args.Visible)
+                    OnForeground();
+                else
+                    OnBackground();
+            })
+            .OnClosed((window, args) => OnBackground()));
 #endif
     }
 
