@@ -253,7 +253,7 @@ else if (_projects is not null)
             _projects = await Api.GetProjectsAsync();
             _stats = (await Api.GetEventsPerHourAsync(hours: 24)).ToList();
 
-            var issues = await Api.GetIssuesAsync(take: 50);
+            var issues = await Api.GetIssuesAsync(take: 50, status: "Unresolved");
             _issuesTotal = issues.Total;
             _topIssues = issues.Items.OrderByDescending(i => i.EventCount).Take(5).ToList();
 

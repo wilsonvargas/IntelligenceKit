@@ -35,6 +35,8 @@ public class IntelligenceDbContext : DbContext
         // One issue per (project, fingerprint); also the upsert lookup path.
         issue.HasIndex(i => new { i.ProjectId, i.Fingerprint }).IsUnique();
         issue.HasIndex(i => new { i.ProjectId, i.LastSeen });
+        issue.Property(i => i.Status).HasMaxLength(16);
+        issue.HasIndex(i => new { i.ProjectId, i.Status });
 
         var project = modelBuilder.Entity<Project>();
         project.HasKey(p => p.Id);

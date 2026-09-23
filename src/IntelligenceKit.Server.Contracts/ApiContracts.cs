@@ -30,7 +30,8 @@ public record TimeBucket(DateTime Start, int Total, int Exceptions);
 /// <summary>
 /// A grouped problem for the Issues view. <c>RecentCount</c>/<c>PreviousCount</c>
 /// are occurrences in the last hour vs the hour before, so the client can draw a
-/// trend arrow.
+/// trend arrow. <c>Status</c> is Unresolved | Resolved | Ignored; <c>IsRegression</c>
+/// flags a resolved issue that came back.
 /// </summary>
 public record IssueSummary(
     Guid Id,
@@ -45,7 +46,20 @@ public record IssueSummary(
     DateTime LastSeen,
     Guid LastEventId,
     int RecentCount,
-    int PreviousCount);
+    int PreviousCount,
+    string Status = "Unresolved",
+    bool IsRegression = false,
+    string? AssignedTo = null,
+    DateTime? ResolvedAt = null,
+    string? ResolvedInRelease = null,
+    DateTime? RegressedAt = null);
+
+/// <summary>
+/// Triage update for an issue (PATCH /issues/{id}). Every field is optional; only
+/// the ones present are applied. <c>AssignedTo</c> = "" clears the assignee.
+/// <c>ResolvedInRelease</c> only applies together with <c>Status = Resolved</c>.
+/// </summary>
+public record UpdateIssueRequest(string? Status = null, string? AssignedTo = null, string? ResolvedInRelease = null);
 
 /// <summary>Per-project rollup for the projects overview.</summary>
 public record ProjectSummary(

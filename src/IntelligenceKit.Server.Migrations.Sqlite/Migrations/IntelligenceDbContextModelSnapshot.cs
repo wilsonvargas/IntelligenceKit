@@ -23,6 +23,9 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("AssignedTo")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Culprit")
                         .HasColumnType("TEXT");
 
@@ -40,6 +43,9 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                     b.Property<DateTime>("FirstSeen")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsRegression")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("LastEventId")
                         .HasColumnType("TEXT");
 
@@ -53,6 +59,20 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("RegressedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResolvedInRelease")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -63,6 +83,8 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                         .IsUnique();
 
                     b.HasIndex("ProjectId", "LastSeen");
+
+                    b.HasIndex("ProjectId", "Status");
 
                     b.ToTable("Issues");
                 });

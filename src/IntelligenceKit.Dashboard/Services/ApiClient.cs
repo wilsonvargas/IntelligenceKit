@@ -65,11 +65,13 @@ public class ApiClient(HttpClient http)
     }
 
     public async Task<PagedResult<IssueSummary>> GetIssuesAsync(
-        string? projectId = null, int skip = 0, int take = 50, CancellationToken ct = default)
+        string? projectId = null, int skip = 0, int take = 50, string? status = null, CancellationToken ct = default)
     {
         var url = $"/issues?skip={skip}&take={take}";
         if (!string.IsNullOrWhiteSpace(projectId))
             url += $"&projectId={Uri.EscapeDataString(projectId)}";
+        if (!string.IsNullOrWhiteSpace(status))
+            url += $"&status={Uri.EscapeDataString(status)}";
 
         return await http.GetFromJsonAsync<PagedResult<IssueSummary>>(url, JsonOptions, ct)
                ?? new PagedResult<IssueSummary>(0, skip, take, Array.Empty<IssueSummary>());
@@ -81,6 +83,14 @@ public class ApiClient(HttpClient http)
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
 
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IssueSummary>(JsonOptions, ct);
+    }
+
+    /// <summary>Triage an issue (status / assignee). Returns the updated issue.</summary>
+    public async Task<IssueSummary?> UpdateIssueAsync(Guid id, UpdateIssueRequest request, CancellationToken ct = default)
+    {
+        var response = await http.PatchAsJsonAsync($"/issues/{id}", request, JsonOptions, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<IssueSummary>(JsonOptions, ct);
     }

@@ -19,11 +19,55 @@ else
     <div class="d-flex align-items-center gap-2 mb-1">
         <h1 class="h4 mb-0 text-danger">@_issue.Title</h1>
         <span class="badge @BadgeClass(_issue.EventType)">@_issue.EventType</span>
+        <IssueStatusBadge Issue="_issue" />
     </div>
     @if (!string.IsNullOrWhiteSpace(_issue.Culprit))
     {
         <div class="text-muted mb-3"><code>@_issue.Culprit</code></div>
     }
+
+    @* Triage bar: resolve (optionally pinned to a release), ignore, reopen, assign. *@
+    <div class="card mb-4">
+        <div class="card-body py-2 d-flex flex-wrap align-items-end gap-2">
+            @if (_issue.Status != "Resolved")
+            {
+                <div>
+                    <label class="form-label small text-muted mb-1">Fixed in release (optional)</label>
+                    <input class="form-control form-control-sm" style="width: 11rem" placeholder="e.g. 2.4.0" @bind="_resolveRelease" />
+                </div>
+                <button class="btn btn-success btn-sm" disabled="@_saving" @onclick="Resolve">Resolve</button>
+            }
+            else
+            {
+                <span class="small text-muted align-self-center">
+                    Resolved @_issue.ResolvedAt?.ToLocalTime().ToString("g")
+                    @if (!string.IsNullOrWhiteSpace(_issue.ResolvedInRelease))
+                    {
+                        <text> in <code>@_issue.ResolvedInRelease</code></text>
+                    }
+                </span>
+            }
+            @if (_issue.Status != "Ignored")
+            {
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_saving" @onclick="Ignore">Ignore</button>
+            }
+            @if (_issue.Status != "Unresolved")
+            {
+                <button class="btn btn-outline-primary btn-sm" disabled="@_saving" @onclick="Reopen">Reopen</button>
+            }
+            <div class="ms-md-auto">
+                <label class="form-label small text-muted mb-1">Assignee</label>
+                <div class="input-group input-group-sm">
+                    <input class="form-control" style="width: 13rem" placeholder="unassigned" @bind="_assignee" />
+                    <button class="btn btn-outline-secondary" disabled="@_saving" @onclick="Assign">Save</button>
+                </div>
+            </div>
+            @if (_triageError is not null)
+            {
+                <div class="text-danger small w-100">@_triageError</div>
+            }
+        </div>
+    </div>
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
@@ -118,6 +162,10 @@ else
     private PagedResult<EventSummary>? _events;
     private int _skip;
     private string? _error;
+    private string? _triageError;
+    private string? _resolveRelease;
+    private string? _assignee;
+    private bool _saving;
 
     private bool HasNext => _events is not null && _skip + _events.Items.Count < _events.Total;
 
@@ -135,11 +183,45 @@ else
                 _error = "That issue was not found.";
                 return;
             }
+            _assignee = _issue.AssignedTo;
             await LoadEventsAsync();
         }
         catch (Exception ex)
         {
             _error = $"Could not reach the API: {ex.Message}";
+        }
+    }
+
+    private Task Resolve() => TriageAsync(new UpdateIssueRequest(Status: "Resolved", ResolvedInRelease: _resolveRelease));
+
+    private Task Ignore() => TriageAsync(new UpdateIssueRequest(Status: "Ignored"));
+
+    private Task Reopen() => TriageAsync(new UpdateIssueRequest(Status: "Unresolved"));
+
+    private Task Assign() => TriageAsync(new UpdateIssueRequest(AssignedTo: _assignee ?? string.Empty));
+
+    private async Task TriageAsync(UpdateIssueRequest request)
+    {
+        _saving = true;
+        _triageError = null;
+        try
+        {
+            var updated = await Api.UpdateIssueAsync(Id, request);
+            if (updated is not null && _issue is not null)
+            {
+                // Keep the trend counts we already have; the PATCH reply doesn't carry them.
+                _issue = updated with { RecentCount = _issue.RecentCount, PreviousCount = _issue.PreviousCount };
+                _assignee = _issue.AssignedTo;
+                _resolveRelease = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _triageError = $"Could not update the issue: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
         }
     }
 

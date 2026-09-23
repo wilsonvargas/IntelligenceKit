@@ -1,0 +1,18 @@
+@* Compact status chip for an issue: status plus a "regression" marker. *@
+
+@if (Issue.IsRegression)
+{
+    <span class="badge text-bg-warning" title="Resolved earlier, then seen again@(Issue.RegressedAt is { } at ? $" ({at.ToLocalTime():g})" : "")">Regression</span>
+}
+<span class="badge @Css">@Issue.Status</span>
+
+@code {
+    [Parameter, EditorRequired] public IssueSummary Issue { get; set; } = default!;
+
+    private string Css => Issue.Status switch
+    {
+        "Resolved" => "text-bg-success",
+        "Ignored" => "text-bg-secondary",
+        _ => "text-bg-light border"
+    };
+}

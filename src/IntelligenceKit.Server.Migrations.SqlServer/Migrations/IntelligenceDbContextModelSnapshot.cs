@@ -28,6 +28,9 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AssignedTo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Culprit")
                         .HasColumnType("nvarchar(max)");
 
@@ -45,6 +48,9 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                     b.Property<DateTime>("FirstSeen")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsRegression")
+                        .HasColumnType("bit");
+
                     b.Property<Guid>("LastEventId")
                         .HasColumnType("uniqueidentifier");
 
@@ -58,6 +64,20 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<DateTime?>("RegressedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResolvedInRelease")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -68,6 +88,8 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                         .IsUnique();
 
                     b.HasIndex("ProjectId", "LastSeen");
+
+                    b.HasIndex("ProjectId", "Status");
 
                     b.ToTable("Issues");
                 });
