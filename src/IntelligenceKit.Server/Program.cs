@@ -638,6 +638,7 @@ app.MapSessionEndpoints();
 app.MapReleaseEndpoints();
 app.MapPerformanceEndpoints();
 app.MapFeedbackEndpoints();
+app.MapDistributionEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 app.MapSymbolEndpoints(AdminOnly);
 

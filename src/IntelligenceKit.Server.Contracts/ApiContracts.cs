@@ -285,3 +285,12 @@ public sealed class EventFilter
         return string.Join('&', parts);
     }
 }
+
+/// <summary>How an issue's recent events spread across one dimension (platform, OS, a tag…).</summary>
+public record Distribution(string Key, int Total, IReadOnlyList<DistributionValue> Values);
+
+/// <summary>One value of a <see cref="Distribution"/>; <c>Share</c> is 0–1.</summary>
+public record DistributionValue(string Value, int Count, double Share);
+
+/// <summary>Distributions of an issue over its latest <c>SampledEvents</c> events.</summary>
+public record IssueDistributions(int SampledEvents, int AffectedUsers, IReadOnlyList<Distribution> Distributions);

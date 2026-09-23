@@ -1,0 +1,51 @@
+@* Where an issue happens: top values per dimension (platform, OS, release, tags…). *@
+
+@if (Data is { Distributions.Count: > 0 })
+{
+    <div class="d-flex align-items-baseline gap-2 mb-2">
+        <h2 class="h6 mb-0">Distribution</h2>
+        <span class="small text-muted">
+            last @Data.SampledEvents events@(Data.AffectedUsers > 0 ? $" · {Data.AffectedUsers} users affected" : "")
+        </span>
+    </div>
+    <div class="row g-3 mb-4">
+        @foreach (var d in Data.Distributions)
+        {
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="card h-100">
+                    <div class="card-body py-2">
+                        <div class="small fw-semibold text-muted text-uppercase mb-2">@Label(d.Key)</div>
+                        @foreach (var v in d.Values)
+                        {
+                            <div class="mb-1" title="@v.Count events">
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-truncate me-2">@v.Value</span>
+                                    <span class="text-muted">@Percent(v.Share)</span>
+                                </div>
+                                <div class="progress" style="height: .35rem">
+                                    <div class="progress-bar @(v.Value == "(other)" ? "bg-secondary" : "")" style="width: @Width(v.Share)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IssueDistributions? Data { get; set; }
+
+    private static string Label(string key) => key switch
+    {
+        "os" => "Operating system",
+        "device" => "Device",
+        _ when key.StartsWith("tag:") => "Tag · " + key[4..],
+        _ => char.ToUpperInvariant(key[0]) + key[1..]
+    };
+
+    private static string Percent(double share) => (share * 100).ToString("0.#") + "%";
+
+    private static string Width(double share) => (share * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}

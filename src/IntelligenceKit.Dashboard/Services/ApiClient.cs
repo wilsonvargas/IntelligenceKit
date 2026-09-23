@@ -139,6 +139,9 @@ public class ApiClient(HttpClient http)
                ?? Array.Empty<PerformanceSummary>();
     }
 
+    public async Task<IssueDistributions?> GetIssueDistributionsAsync(Guid issueId, CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IssueDistributions>($"/issues/{issueId}/distributions", JsonOptions, ct);
+
     public async Task<IReadOnlyList<FeedbackInfo>> GetIssueFeedbackAsync(Guid issueId, CancellationToken ct = default)
         => await http.GetFromJsonAsync<IReadOnlyList<FeedbackInfo>>($"/issues/{issueId}/feedback", JsonOptions, ct)
            ?? Array.Empty<FeedbackInfo>();

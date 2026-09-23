@@ -110,6 +110,8 @@ else
         </div>
     </div>
 
+    <DistributionsPanel Data="_distributions" />
+
     <FeedbackList Items="_feedback" ShowEventLink="true" />
 
     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -176,6 +178,7 @@ else
     private string? _error;
     private string? _triageError;
     private IReadOnlyList<FeedbackInfo>? _feedback;
+    private IssueDistributions? _distributions;
     private string? _resolveRelease;
     private string? _assignee;
     private bool _saving;
@@ -189,6 +192,7 @@ else
         _issue = null;
         _events = null;
         _feedback = null;
+        _distributions = null;
         try
         {
             _issue = await Api.GetIssueAsync(Id);
@@ -200,6 +204,7 @@ else
             _assignee = _issue.AssignedTo;
             await LoadEventsAsync();
             _feedback = await Api.GetIssueFeedbackAsync(Id);
+            _distributions = await Api.GetIssueDistributionsAsync(Id);
         }
         catch (Exception ex)
         {
