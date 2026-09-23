@@ -11,6 +11,7 @@ using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
 using IntelligenceKit.Server.Feedback;
 using IntelligenceKit.Server.Ingest;
+using IntelligenceKit.Server.Integrations;
 using IntelligenceKit.Server.Performance;
 using IntelligenceKit.Server.Projects;
 using IntelligenceKit.Server.Releases;
@@ -84,6 +85,9 @@ builder.Services.AddSingleton<AlertQueue>();
 builder.Services.AddSingleton<AlertSender>();
 builder.Services.AddScoped<AlertEvaluator>();
 builder.Services.AddHostedService<AlertDispatcher>();
+
+// Outbound calls to GitHub/Jira when creating external issues.
+builder.Services.AddHttpClient(IssueTrackerEndpoints.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
 
 // Data retention: a background service prunes events/screenshots/issues older
 // than Retention:Days on a Retention:SweepHours cadence. Off by default (opt in
@@ -640,6 +644,8 @@ app.MapPerformanceEndpoints();
 app.MapFeedbackEndpoints();
 app.MapDistributionEndpoints();
 app.MapUserEndpoints();
+app.MapExportEndpoints();
+app.MapIssueTrackerEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 app.MapSymbolEndpoints(AdminOnly);
 

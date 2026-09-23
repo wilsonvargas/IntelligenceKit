@@ -14,12 +14,18 @@ public sealed class CapturingHandler : HttpMessageHandler
 
     public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
+    /// <summary>Optional JSON body returned with every response.</summary>
+    public string? ResponseBody { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         request.Headers.TryGetValues(AlertSender.SignatureHeader, out var sig);
         Requests.Enqueue((request.RequestUri!, body, sig?.FirstOrDefault()));
-        return new HttpResponseMessage(Status);
+        var response = new HttpResponseMessage(Status);
+        if (ResponseBody is not null)
+            response.Content = new StringContent(ResponseBody, System.Text.Encoding.UTF8, "application/json");
+        return response;
     }
 }
 

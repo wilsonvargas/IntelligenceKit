@@ -244,6 +244,9 @@ namespace IntelligenceKit.Server.Migrations.PostgreSql.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("ExternalIssueUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("Fingerprint")
                         .IsRequired()
                         .HasColumnType("text");

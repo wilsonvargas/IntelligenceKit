@@ -62,6 +62,9 @@ public class Issue
 
     /// <summary>Release of the most recent event.</summary>
     public string? LastRelease { get; set; }
+
+    /// <summary>Linked GitHub/Jira issue, once one was created from here.</summary>
+    public string? ExternalIssueUrl { get; set; }
 }
 
 /// <summary>Allowed values for <see cref="Issue.Status"/>.</summary>

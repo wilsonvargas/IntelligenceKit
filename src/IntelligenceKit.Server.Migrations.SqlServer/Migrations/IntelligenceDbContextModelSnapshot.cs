@@ -244,6 +244,9 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ExternalIssueUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Fingerprint")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");

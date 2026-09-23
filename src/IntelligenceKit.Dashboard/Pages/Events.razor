@@ -3,6 +3,7 @@
 @inject ApiClient Api
 @inject NavigationManager Nav
 @inject LiveEventsClient Live
+@inject AuthState Auth
 
 <PageTitle>Events — IntelligenceKit</PageTitle>
 
@@ -159,6 +160,7 @@ else
     <div class="d-flex justify-content-between align-items-center">
         <div class="text-muted small">
             Showing @(_skip + 1)–@(_skip + _page.Items.Count) of @_page.Total
+            · export <a href="@ExportUrl("csv")" download>CSV</a> / <a href="@ExportUrl("json")" download>JSON</a>
         </div>
         <div class="btn-group">
             <button class="btn btn-outline-secondary btn-sm" @onclick="Prev" disabled="@(_skip == 0)">Previous</button>
@@ -285,6 +287,16 @@ else
         _f.Tag = string.IsNullOrWhiteSpace(_tag) ? null : [_tag.Trim()];
         var query = _f.ToQueryString();
         Nav.NavigateTo(query.Length == 0 ? "/events" : $"/events?{query}");
+    }
+
+    /// <summary>Download link for the current filters (a link can't send headers, so the token rides in the query).</summary>
+    private string ExportUrl(string format)
+    {
+        var url = $"{Api.BaseAddress}events/export?format={format}";
+        var query = _f.ToQueryString();
+        if (query.Length > 0)
+            url += "&" + query;
+        return Auth.HasToken ? $"{url}&access_token={Uri.EscapeDataString(Auth.Token!)}" : url;
     }
 
     private void OnSearchKey(KeyboardEventArgs e)

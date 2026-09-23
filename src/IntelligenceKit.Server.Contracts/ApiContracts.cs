@@ -54,7 +54,8 @@ public record IssueSummary(
     string? ResolvedInRelease = null,
     DateTime? RegressedAt = null,
     string? FirstRelease = null,
-    string? LastRelease = null);
+    string? LastRelease = null,
+    string? ExternalIssueUrl = null);
 
 /// <summary>
 /// Triage update for an issue (PATCH /issues/{id}). Every field is optional; only
@@ -306,3 +307,12 @@ public record UserTimeline(
     int CrashedSessions,
     IReadOnlyList<IssueSummary> Issues,
     IReadOnlyList<EventSummary> Events);
+
+/// <summary>Which issue trackers the server is configured for.</summary>
+public record IntegrationsInfo(bool GitHub, bool GitHubCreatesViaApi, bool Jira);
+
+/// <summary>
+/// Result of "create external issue". <c>Prefilled</c>: the URL opens a prefilled
+/// form the user submits (GitHub without a token); <c>Created</c>: it was created now.
+/// </summary>
+public record ExternalIssueResult(string Url, bool Created, bool Prefilled);

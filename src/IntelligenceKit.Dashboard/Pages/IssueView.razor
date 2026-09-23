@@ -65,6 +65,27 @@ else
             {
                 <button class="btn btn-outline-primary btn-sm" disabled="@_saving" @onclick="Reopen">Reopen</button>
             }
+            @if (!string.IsNullOrEmpty(_issue.ExternalIssueUrl))
+            {
+                <a class="btn btn-outline-dark btn-sm" href="@_issue.ExternalIssueUrl" target="_blank" rel="noopener">Open linked issue ↗</a>
+            }
+            else
+            {
+                @if (_integrations?.GitHub == true)
+                {
+                    <button class="btn btn-outline-dark btn-sm" disabled="@_saving" @onclick="@(() => ExternalAsync("github"))">
+                        @(_integrations.GitHubCreatesViaApi ? "Create GitHub issue" : "Draft GitHub issue")
+                    </button>
+                }
+                @if (_integrations?.Jira == true)
+                {
+                    <button class="btn btn-outline-dark btn-sm" disabled="@_saving" @onclick="@(() => ExternalAsync("jira"))">Create Jira issue</button>
+                }
+                @if (_prefilledUrl is not null)
+                {
+                    <a class="btn btn-link btn-sm" href="@_prefilledUrl" target="_blank" rel="noopener">Open the prefilled GitHub form ↗</a>
+                }
+            }
             <div class="ms-md-auto">
                 <label class="form-label small text-muted mb-1">Assignee</label>
                 <div class="input-group input-group-sm">
@@ -194,6 +215,8 @@ else
     private IReadOnlyList<FeedbackInfo>? _feedback;
     private IssueDistributions? _distributions;
     private IReadOnlyList<AffectedUser>? _users;
+    private IntegrationsInfo? _integrations;
+    private string? _prefilledUrl;
     private string? _resolveRelease;
     private string? _assignee;
     private bool _saving;
@@ -209,6 +232,7 @@ else
         _feedback = null;
         _distributions = null;
         _users = null;
+        _prefilledUrl = null;
         try
         {
             _issue = await Api.GetIssueAsync(Id);
@@ -222,6 +246,7 @@ else
             _feedback = await Api.GetIssueFeedbackAsync(Id);
             _distributions = await Api.GetIssueDistributionsAsync(Id);
             _users = await Api.GetIssueUsersAsync(Id);
+            _integrations = await Api.GetIntegrationsAsync();
         }
         catch (Exception ex)
         {
@@ -255,6 +280,30 @@ else
         catch (Exception ex)
         {
             _triageError = $"Could not update the issue: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ExternalAsync(string provider)
+    {
+        _saving = true;
+        _triageError = null;
+        try
+        {
+            var (result, error) = await Api.CreateExternalIssueAsync(Id, provider);
+            if (error is not null)
+                _triageError = error;
+            else if (result is { Prefilled: true })
+                _prefilledUrl = result.Url;
+            else if (result is not null && _issue is not null)
+                _issue = _issue with { ExternalIssueUrl = result.Url };
+        }
+        catch (Exception ex)
+        {
+            _triageError = ex.Message;
         }
         finally
         {

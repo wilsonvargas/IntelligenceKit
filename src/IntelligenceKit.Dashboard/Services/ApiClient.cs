@@ -189,6 +189,18 @@ public class ApiClient(HttpClient http)
     public async Task DeleteProjectAsync(Guid id, CancellationToken ct = default)
         => (await http.DeleteAsync($"/admin/projects/{id}", ct)).EnsureSuccessStatusCode();
 
+    public async Task<IntegrationsInfo?> GetIntegrationsAsync(CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IntegrationsInfo>("/integrations", JsonOptions, ct);
+
+    /// <summary>Creates (or returns the existing) GitHub/Jira issue. Returns the server's error on failure.</summary>
+    public async Task<(ExternalIssueResult? Result, string? Error)> CreateExternalIssueAsync(Guid issueId, string provider, CancellationToken ct = default)
+    {
+        var response = await http.PostAsync($"/issues/{issueId}/external/{provider}", null, ct);
+        if (!response.IsSuccessStatusCode)
+            return (null, (await response.Content.ReadAsStringAsync(ct)).Trim('"'));
+        return (await response.Content.ReadFromJsonAsync<ExternalIssueResult>(JsonOptions, ct), null);
+    }
+
     // Alerts (admin-only) ---------------------------------------------------
 
     public async Task<IReadOnlyList<AlertRuleInfo>> GetAlertRulesAsync(CancellationToken ct = default)
