@@ -64,4 +64,13 @@ public class IntelligenceOptions
     /// new session instead of continuing the previous one.
     /// </summary>
     public TimeSpan SessionTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Report "Application Not Responding" when the UI thread is blocked for longer
+    /// than <see cref="AnrThreshold"/>.
+    /// </summary>
+    public bool EnableAnrDetection { get; set; } = true;
+
+    /// <summary>How long the UI thread may be unresponsive before it counts as an ANR (default 5 s, like Android).</summary>
+    public TimeSpan AnrThreshold { get; set; } = TimeSpan.FromSeconds(5);
 }

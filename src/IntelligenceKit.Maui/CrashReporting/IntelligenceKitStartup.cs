@@ -1,3 +1,4 @@
+using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Services;
 using IntelligenceKit.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,9 @@ internal sealed class IntelligenceKitStartup : IMauiInitializeService
 
         // Begin the first session (only registered when auto session tracking is on).
         _ = services.GetService<ISessionTracker>()?.StartAsync();
+
+        // Start watching for a frozen UI (only registered when ANR detection is on).
+        services.GetService<UiThreadWatchdog>()?.Start();
 
         var uploader = services.GetRequiredService<IEventUploader>();
 

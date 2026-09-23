@@ -44,10 +44,17 @@ public static class MauiAppBuilderExtensions
         // Release health: session tracking driven by the app lifecycle.
         builder.Services.AddSingleton<IInstallationIdProvider, MauiInstallationIdProvider>();
         if (options.EnableAutoSessionTracking)
-        {
             builder.Services.AddSingleton<ISessionTracker, SessionTracker>();
-            builder.ConfigureLifecycleEvents(RegisterSessionLifecycle);
+
+        // Frozen-UI (ANR) detection: a background watchdog pinging the main thread.
+        if (options.EnableAnrDetection)
+        {
+            builder.Services.AddSingleton<IUiThreadDispatcher, MauiUiThreadDispatcher>();
+            builder.Services.AddSingleton<UiThreadWatchdog>();
         }
+
+        if (options.EnableAutoSessionTracking || options.EnableAnrDetection)
+            builder.ConfigureLifecycleEvents(RegisterAppLifecycle);
         builder.Services.AddSingleton<IIntelligenceKit, IntelligenceKitService>();
         builder.Services.AddSingleton<IDeviceContextProvider, MauiDeviceContextProvider>();
 
@@ -76,22 +83,34 @@ public static class MauiAppBuilderExtensions
     }
 
     /// <summary>
-    /// Pauses the session when the app goes to the background and resumes (or
-    /// restarts, after <c>SessionTimeout</c>) it when the app comes back.
+    /// Foreground/background hooks: the session is paused in the background and
+    /// resumed (or restarted, after <c>SessionTimeout</c>) when the app returns; the
+    /// ANR watchdog only watches while the app is in the foreground.
     /// </summary>
-    private static void RegisterSessionLifecycle(ILifecycleBuilder events)
+    private static void RegisterAppLifecycle(ILifecycleBuilder events)
     {
 #if ANDROID
         events.AddAndroid(android => android
-            .OnStart(activity => Sessions()?.ResumeAsync())
-            .OnStop(activity => Sessions()?.PauseAsync()));
+            .OnStart(activity => OnForeground())
+            .OnStop(activity => OnBackground()));
 #elif IOS || MACCATALYST
         events.AddiOS(ios => ios
-            .WillEnterForeground(application => Sessions()?.ResumeAsync())
-            .DidEnterBackground(application => Sessions()?.PauseAsync()));
+            .WillEnterForeground(application => OnForeground())
+            .DidEnterBackground(application => OnBackground()));
 #endif
     }
 
-    private static ISessionTracker? Sessions()
-        => IPlatformApplication.Current?.Services.GetService<ISessionTracker>();
+    private static void OnForeground()
+    {
+        var services = IPlatformApplication.Current?.Services;
+        _ = services?.GetService<ISessionTracker>()?.ResumeAsync();
+        services?.GetService<UiThreadWatchdog>()?.Start();
+    }
+
+    private static void OnBackground()
+    {
+        var services = IPlatformApplication.Current?.Services;
+        services?.GetService<UiThreadWatchdog>()?.Pause();
+        _ = services?.GetService<ISessionTracker>()?.PauseAsync();
+    }
 }
