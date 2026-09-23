@@ -7,7 +7,6 @@ using IntelligenceKit.Extensions.Logging;
 using IntelligenceKit.Maui.CrashReporting;
 using IntelligenceKit.Maui.Diagnostics;
 using IntelligenceKit.Maui.Providers;
-using IntelligenceKit.Maui.Services;
 using IntelligenceKit.Maui.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Hosting;

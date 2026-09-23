@@ -9,7 +9,16 @@
   <Project Path="src/IntelligenceKit.Server.Migrations.SqlServer/IntelligenceKit.Server.Migrations.SqlServer.csproj" />
   <Project Path="src/IntelligenceKit.Server/IntelligenceKit.Server.csproj" />
   <Folder Name="/src/">
+    <Project Path="src/IntelligenceKit.AspNetCore/IntelligenceKit.AspNetCore.csproj" />
+    <Project Path="src/IntelligenceKit.Avalonia/IntelligenceKit.Avalonia.csproj" />
+    <Project Path="src/IntelligenceKit.Blazor/IntelligenceKit.Blazor.csproj" />
     <Project Path="src/IntelligenceKit.Extensions.Logging/IntelligenceKit.Extensions.Logging.csproj" />
+    <Project Path="src/IntelligenceKit.Hosting/IntelligenceKit.Hosting.csproj" />
+    <Project Path="src/IntelligenceKit.WinForms/IntelligenceKit.WinForms.csproj" />
+    <Project Path="src/IntelligenceKit.Wpf/IntelligenceKit.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IntelligenceKit.Sdk.Tests/IntelligenceKit.Sdk.Tests.csproj" />
   </Folder>
   <Project Path="samples/Sample.Maui/Sample.Maui.csproj">
     <Deploy Solution="Debug|*" />

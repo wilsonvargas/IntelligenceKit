@@ -86,6 +86,7 @@ public class IntelligenceKitService : IIntelligenceKit
 
     public Task TrackExceptionAsync(Exception exception)
     {
+        ExceptionCapture.MarkCaptured(exception);
         return TrackExceptionAsync(ExceptionInfo.FromException(exception));
     }
 
@@ -132,13 +133,34 @@ public class IntelligenceKitService : IIntelligenceKit
     public void AddBreadcrumb(string message, string category = BreadcrumbCategories.Custom,
         SeverityLevel level = SeverityLevel.Information, IDictionary<string, string>? data = null)
     {
-        _breadcrumbs.Add(new Breadcrumb
+        var breadcrumb = new Breadcrumb
         {
             Message = message,
             Category = category,
             Level = level,
             Data = data is null ? new() : new Dictionary<string, string>(data)
-        });
+        };
+
+        // Inside a scope (e.g. one request), the trail belongs to that scope.
+        if (IntelligenceScope.Current is { } scope)
+        {
+            if (_options.BeforeBreadcrumb is { } hook)
+            {
+                try
+                {
+                    breadcrumb = hook(breadcrumb);
+                }
+                catch
+                {
+                }
+                if (breadcrumb is null)
+                    return;
+            }
+            scope.AddBreadcrumb(breadcrumb);
+            return;
+        }
+
+        _breadcrumbs.Add(breadcrumb);
     }
 
     public void SetUser(string? userId)
@@ -295,14 +317,22 @@ public class IntelligenceKitService : IIntelligenceKit
 
         // Runtime snapshot + scope.
         intelligenceEvent.DeviceRuntime = SafeCaptureRuntime();
-        intelligenceEvent.UserId ??= _userId;
 
+        // Ambient scope (e.g. the current request) first, then global scope.
+        var scope = IntelligenceScope.Current;
+        intelligenceEvent.UserId ??= scope?.UserId ?? _userId;
+
+        if (scope is not null)
+        {
+            foreach (var kv in scope.Tags)
+                intelligenceEvent.Tags.TryAdd(kv.Key, kv.Value);
+        }
         foreach (var kv in _tags)
             intelligenceEvent.Tags.TryAdd(kv.Key, kv.Value);
 
         // Attach the breadcrumb trail (only if the caller didn't supply one).
         if (intelligenceEvent.Breadcrumbs.Count == 0)
-            intelligenceEvent.Breadcrumbs = _breadcrumbs.Snapshot().ToList();
+            intelligenceEvent.Breadcrumbs = (scope?.Breadcrumbs() ?? _breadcrumbs.Snapshot()).ToList();
     }
 
     private DeviceRuntime? SafeCaptureRuntime()

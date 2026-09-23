@@ -21,7 +21,10 @@ public sealed class IntelligenceKitLoggerOptions
     /// </summary>
     public List<string> ExcludedCategoryPrefixes { get; set; } =
     [
-        "IntelligenceKit",
+        "IntelligenceKit.Core.",
+        "IntelligenceKit.Extensions.",
+        "IntelligenceKit.Hosting.",
+        "IntelligenceKit.Maui.",
         "System.Net.Http.HttpClient.IIntelligenceClient",
     ];
 }
@@ -113,8 +116,15 @@ internal sealed class IntelligenceKitLogger : ILogger
                 kit.AddBreadcrumb(message, BreadcrumbCategories.Log, level, data);
             }
 
-            if (logLevel >= _provider.Options.MinimumEventLevel)
+            // An exception another integration already reported (e.g. request
+            // middleware) is not reported again when it gets logged.
+            if (logLevel >= _provider.Options.MinimumEventLevel &&
+                (exception is null || !ExceptionCapture.IsCaptured(exception)))
+            {
+                if (exception is not null)
+                    ExceptionCapture.MarkCaptured(exception);
                 _ = SafeTrackAsync(kit, BuildEvent(level, message, template, properties, exception, eventId));
+            }
         }
         catch
         {
