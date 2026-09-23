@@ -117,7 +117,7 @@ public static class MauiAppBuilderExtensions
                 else
                     OnBackground();
             })
-            .OnClosed((window, args) => OnBackground()));
+            .OnClosed((window, args) => OnClosing()));
 #endif
     }
 
@@ -128,11 +128,30 @@ public static class MauiAppBuilderExtensions
         services?.GetService<UiThreadWatchdog>()?.Start();
     }
 
-    private static void OnBackground()
+    private static void OnBackground() => _ = BackgroundAsync();
+
+    /// <summary>
+    /// The process is about to exit (desktop window closed): give the session update
+    /// and buffered spans a bounded moment to reach the local queue. Runs off the UI
+    /// thread so awaiting inside can't deadlock on it.
+    /// </summary>
+    private static void OnClosing()
+    {
+        try
+        {
+            Task.Run(BackgroundAsync).Wait(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+        }
+    }
+
+    private static Task BackgroundAsync()
     {
         var services = IPlatformApplication.Current?.Services;
         services?.GetService<UiThreadWatchdog>()?.Pause();
-        _ = services?.GetService<ISessionTracker>()?.PauseAsync();
-        _ = services?.GetService<IPerformanceMonitor>()?.FlushAsync();
+        return Task.WhenAll(
+            services?.GetService<ISessionTracker>()?.PauseAsync() ?? Task.CompletedTask,
+            services?.GetService<IPerformanceMonitor>()?.FlushAsync() ?? Task.CompletedTask);
     }
 }

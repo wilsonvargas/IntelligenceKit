@@ -3,6 +3,7 @@ using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Enums;
 using IntelligenceKit.Core.Models;
 using IntelligenceKit.Core.Services;
+using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 
 namespace IntelligenceKit.Maui.Diagnostics;
@@ -64,7 +65,25 @@ public sealed class NavigationTracker
 
         app.PageAppearing += OnPageAppearing;
         app.PageDisappearing += OnPageDisappearing;
+
+        // On a fast startup the first page can appear before we subscribe (we poll
+        // for Application.Current); catch up so the first screen and the app-start
+        // timing aren't lost. Skipped if PageAppearing already fired meanwhile.
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (CurrentScreen is null && app.Windows.FirstOrDefault()?.Page is { } root)
+                OnPageAppearing(app, VisiblePage(root));
+        });
     }
+
+    /// <summary>The page actually on screen inside a Shell/NavigationPage/FlyoutPage container.</summary>
+    private static Page VisiblePage(Page root) => root switch
+    {
+        Shell { CurrentPage: { } current } => current,
+        NavigationPage { CurrentPage: { } current } => current,
+        FlyoutPage { Detail: { } detail } => VisiblePage(detail),
+        _ => root
+    };
 
     private void OnPageDisappearing(object? sender, Page page)
         => _navigationStartTicks = System.Diagnostics.Stopwatch.GetTimestamp();
