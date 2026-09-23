@@ -200,6 +200,9 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("FirstRelease")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("FirstSeen")
                         .HasColumnType("TEXT");
 
@@ -207,6 +210,9 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid>("LastEventId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastRelease")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("LastSeen")
@@ -241,6 +247,8 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
 
                     b.HasIndex("ProjectId", "Fingerprint")
                         .IsUnique();
+
+                    b.HasIndex("ProjectId", "FirstRelease");
 
                     b.HasIndex("ProjectId", "LastSeen");
 

@@ -52,7 +52,9 @@ public record IssueSummary(
     string? AssignedTo = null,
     DateTime? ResolvedAt = null,
     string? ResolvedInRelease = null,
-    DateTime? RegressedAt = null);
+    DateTime? RegressedAt = null,
+    string? FirstRelease = null,
+    string? LastRelease = null);
 
 /// <summary>
 /// Triage update for an issue (PATCH /issues/{id}). Every field is optional; only
@@ -184,3 +186,22 @@ public record CrashFreeStats(
 
 /// <summary>One UTC day of the crash-free series.</summary>
 public record CrashFreeDay(DateTime Date, int Sessions, int CrashedSessions, double? CrashFreeSessionRate);
+
+/// <summary>
+/// Health of one release over a window. <c>Adoption</c> is this release's share of
+/// all sessions in the last 24 hours (0–1, null without sessions). <c>NewIssues</c>
+/// counts issues first seen in this release.
+/// </summary>
+public record ReleaseHealth(
+    string Release,
+    DateTime FirstSeen,
+    DateTime LastSeen,
+    int Sessions,
+    int CrashedSessions,
+    double? CrashFreeSessionRate,
+    int Users,
+    double? CrashFreeUserRate,
+    double? Adoption,
+    int Events,
+    int Exceptions,
+    int NewIssues);

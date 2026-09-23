@@ -10,7 +10,8 @@ public static class Mapping
         => new(
             i.Id, i.ProjectId, i.Fingerprint, i.Title, i.Culprit, i.EventType, i.Level,
             i.EventCount, i.FirstSeen, i.LastSeen, i.LastEventId, recentCount, previousCount,
-            i.Status, i.IsRegression, i.AssignedTo, i.ResolvedAt, i.ResolvedInRelease, i.RegressedAt);
+            i.Status, i.IsRegression, i.AssignedTo, i.ResolvedAt, i.ResolvedInRelease, i.RegressedAt,
+            i.FirstRelease, i.LastRelease);
 
     public static EventSummary ToSummary(this StoredEvent e)
         => new(

@@ -11,6 +11,7 @@ using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
 using IntelligenceKit.Server.Ingest;
 using IntelligenceKit.Server.Projects;
+using IntelligenceKit.Server.Releases;
 using IntelligenceKit.Server.Retention;
 using IntelligenceKit.Server.Sessions;
 using Microsoft.AspNetCore.Authentication;
@@ -376,7 +377,8 @@ app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, ClaimsPrin
 // Issues -----------------------------------------------------------------
 // Grouped problems: one row per (project, fingerprint), newest activity first.
 // ?status=Unresolved|Resolved|Ignored narrows the list; omitted = every status.
-app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, string? status, int skip = 0, int take = 50) =>
+// ?release=X keeps only issues first seen in release X ("introduced in").
+app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, string? status, string? release, int skip = 0, int take = 50) =>
 {
     take = Math.Clamp(take, 1, 200);
 
@@ -393,6 +395,9 @@ app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, str
             return Results.BadRequest($"Unknown status '{status}'. Use one of: {string.Join(", ", IssueStatuses.All)}.");
         query = query.Where(i => i.Status == normalized);
     }
+
+    if (!string.IsNullOrWhiteSpace(release))
+        query = query.Where(i => i.FirstRelease == release);
 
     var total = await query.CountAsync();
 
@@ -590,6 +595,7 @@ app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext
 }).RequireAuthorization(AdminOnly);
 
 app.MapSessionEndpoints();
+app.MapReleaseEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();

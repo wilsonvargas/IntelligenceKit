@@ -43,6 +43,7 @@ public class IntelligenceDbContext : DbContext
         issue.HasIndex(i => new { i.ProjectId, i.LastSeen });
         issue.Property(i => i.Status).HasMaxLength(16);
         issue.HasIndex(i => new { i.ProjectId, i.Status });
+        issue.HasIndex(i => new { i.ProjectId, i.FirstRelease });
 
         var project = modelBuilder.Entity<Project>();
         project.HasKey(p => p.Id);

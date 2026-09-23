@@ -13,6 +13,14 @@
     </span>
 </div>
 
+@if (!string.IsNullOrWhiteSpace(Release))
+{
+    <div class="alert alert-secondary py-2 small d-flex align-items-center gap-2">
+        Showing issues introduced in release <code>@Release</code>
+        <a class="ms-auto" href="@TabUrl(_status, withRelease: false)">clear</a>
+    </div>
+}
+
 <ul class="nav nav-pills mb-3">
     @foreach (var (label, value) in StatusTabs)
     {
@@ -125,6 +133,9 @@ else
     /// <summary>Status tab; "all" shows every status. Defaults to the triage inbox.</summary>
     [SupplyParameterFromQuery] public string? Status { get; set; }
 
+    /// <summary>Only issues first seen in this release (linked from the Releases page).</summary>
+    [SupplyParameterFromQuery] public string? Release { get; set; }
+
     private static readonly (string Label, string Value)[] StatusTabs =
     [
         ("Unresolved", "Unresolved"), ("Resolved", "Resolved"), ("Ignored", "Ignored"), ("All", "all")
@@ -169,6 +180,8 @@ else
     {
         // Live-update only the first page and only for the current project filter.
         if (_skip != 0 || _page is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(Release) && issue.FirstRelease != Release)
             return;
         if (!string.IsNullOrWhiteSpace(_projectId) &&
             !string.Equals(issue.ProjectId, _projectId, StringComparison.OrdinalIgnoreCase))
@@ -215,7 +228,7 @@ else
         _page = null;
         try
         {
-            _page = await Api.GetIssuesAsync(_projectId, _skip, PageSize, IsAll ? null : _status);
+            _page = await Api.GetIssuesAsync(_projectId, _skip, PageSize, IsAll ? null : _status, Release);
         }
         catch (Exception ex)
         {
@@ -228,11 +241,13 @@ else
     private bool MatchesTab(IssueSummary issue)
         => IsAll || string.Equals(issue.Status, _status, StringComparison.OrdinalIgnoreCase);
 
-    private string TabUrl(string status)
+    private string TabUrl(string status, bool withRelease = true)
     {
         var url = $"/issues?status={Uri.EscapeDataString(status)}";
         if (!string.IsNullOrWhiteSpace(_projectId))
             url += $"&projectId={Uri.EscapeDataString(_projectId)}";
+        if (withRelease && !string.IsNullOrWhiteSpace(Release))
+            url += $"&release={Uri.EscapeDataString(Release)}";
         return url;
     }
 

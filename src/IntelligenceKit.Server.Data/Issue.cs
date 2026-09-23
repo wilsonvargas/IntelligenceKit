@@ -56,6 +56,12 @@ public class Issue
 
     /// <summary>Free-form owner (name/email/handle). Null = unassigned.</summary>
     public string? AssignedTo { get; set; }
+
+    /// <summary>Release of the first event — "introduced in". Null when unknown.</summary>
+    public string? FirstRelease { get; set; }
+
+    /// <summary>Release of the most recent event.</summary>
+    public string? LastRelease { get; set; }
 }
 
 /// <summary>Allowed values for <see cref="Issue.Status"/>.</summary>

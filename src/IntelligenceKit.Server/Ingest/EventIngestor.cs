@@ -115,6 +115,8 @@ public sealed class EventIngestor
                 LastSeen = stored.ReceivedAt,
                 LastEventId = stored.Id,
                 Status = IssueStatuses.Unresolved,
+                FirstRelease = NullIfEmpty(release),
+                LastRelease = NullIfEmpty(release),
             };
             _db.Issues.Add(issue);
             change = IssueChange.New;
@@ -127,6 +129,8 @@ public sealed class EventIngestor
             issue.Level = stored.Level;
             issue.Title = fingerprint.Title;
             issue.Culprit = fingerprint.Culprit;
+            issue.LastRelease = NullIfEmpty(release) ?? issue.LastRelease;
+            issue.FirstRelease ??= NullIfEmpty(release);
 
             if (issue.Status == IssueStatuses.Resolved && Regresses(issue.ResolvedInRelease, release))
             {
@@ -194,6 +198,8 @@ public sealed class EventIngestor
 
         return Version.TryParse(core, out version!);
     }
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private static StoredEvent ToStored(IntelligenceEvent e, Guid id, string fingerprint, string projectKey) => new()
     {

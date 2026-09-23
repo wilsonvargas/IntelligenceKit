@@ -65,13 +65,16 @@ public class ApiClient(HttpClient http)
     }
 
     public async Task<PagedResult<IssueSummary>> GetIssuesAsync(
-        string? projectId = null, int skip = 0, int take = 50, string? status = null, CancellationToken ct = default)
+        string? projectId = null, int skip = 0, int take = 50, string? status = null,
+        string? release = null, CancellationToken ct = default)
     {
         var url = $"/issues?skip={skip}&take={take}";
         if (!string.IsNullOrWhiteSpace(projectId))
             url += $"&projectId={Uri.EscapeDataString(projectId)}";
         if (!string.IsNullOrWhiteSpace(status))
             url += $"&status={Uri.EscapeDataString(status)}";
+        if (!string.IsNullOrWhiteSpace(release))
+            url += $"&release={Uri.EscapeDataString(release)}";
 
         return await http.GetFromJsonAsync<PagedResult<IssueSummary>>(url, JsonOptions, ct)
                ?? new PagedResult<IssueSummary>(0, skip, take, Array.Empty<IssueSummary>());
@@ -112,6 +115,18 @@ public class ApiClient(HttpClient http)
         if (!string.IsNullOrWhiteSpace(release))
             url += $"&release={Uri.EscapeDataString(release)}";
         return await http.GetFromJsonAsync<CrashFreeStats>(url, JsonOptions, ct);
+    }
+
+    public async Task<IReadOnlyList<ReleaseHealth>> GetReleasesAsync(
+        string? projectId = null, string? environment = null, int days = 30, CancellationToken ct = default)
+    {
+        var url = $"/releases?days={days}";
+        if (!string.IsNullOrWhiteSpace(projectId))
+            url += $"&projectId={Uri.EscapeDataString(projectId)}";
+        if (!string.IsNullOrWhiteSpace(environment))
+            url += $"&environment={Uri.EscapeDataString(environment)}";
+        return await http.GetFromJsonAsync<IReadOnlyList<ReleaseHealth>>(url, JsonOptions, ct)
+               ?? Array.Empty<ReleaseHealth>();
     }
 
     // Alerts (admin-only) ---------------------------------------------------

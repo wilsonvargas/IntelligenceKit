@@ -205,6 +205,9 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("FirstRelease")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<DateTime>("FirstSeen")
                         .HasColumnType("datetime2");
 
@@ -213,6 +216,9 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
 
                     b.Property<Guid>("LastEventId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LastRelease")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("LastSeen")
                         .HasColumnType("datetime2");
@@ -246,6 +252,8 @@ namespace IntelligenceKit.Server.Migrations.SqlServer.Migrations
 
                     b.HasIndex("ProjectId", "Fingerprint")
                         .IsUnique();
+
+                    b.HasIndex("ProjectId", "FirstRelease");
 
                     b.HasIndex("ProjectId", "LastSeen");
 

@@ -23,7 +23,17 @@ else
     </div>
     @if (!string.IsNullOrWhiteSpace(_issue.Culprit))
     {
-        <div class="text-muted mb-3"><code>@_issue.Culprit</code></div>
+        <div class="text-muted mb-1"><code>@_issue.Culprit</code></div>
+    }
+    @if (_issue.FirstRelease is not null)
+    {
+        <div class="small text-muted mb-3">
+            Introduced in <code>@_issue.FirstRelease</code>
+            @if (_issue.LastRelease is not null && _issue.LastRelease != _issue.FirstRelease)
+            {
+                <text> · latest in <code>@_issue.LastRelease</code></text>
+            }
+        </div>
     }
 
     @* Triage bar: resolve (optionally pinned to a release), ignore, reopen, assign. *@
