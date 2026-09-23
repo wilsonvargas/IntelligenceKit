@@ -23,6 +23,8 @@ public class IntelligenceDbContext : DbContext
 
     public DbSet<StoredSpan> Spans => Set<StoredSpan>();
 
+    public DbSet<Feedback> Feedback => Set<Feedback>();
+
     public DbSet<AlertRule> AlertRules => Set<AlertRule>();
 
     public DbSet<AlertNotification> AlertNotifications => Set<AlertNotification>();
@@ -76,6 +78,12 @@ public class IntelligenceDbContext : DbContext
         span.Property(s => s.Operation).HasMaxLength(64);
         span.Property(s => s.Name).HasMaxLength(300);
         span.HasIndex(s => new { s.ProjectId, s.Start });
+
+        var feedback = modelBuilder.Entity<Feedback>();
+        feedback.HasKey(f => f.Id);
+        feedback.HasIndex(f => f.EventId);
+        feedback.HasIndex(f => new { f.IssueId, f.CreatedAt });
+        feedback.HasIndex(f => new { f.ProjectId, f.CreatedAt });
 
         var rule = modelBuilder.Entity<AlertRule>();
         rule.HasKey(r => r.Id);

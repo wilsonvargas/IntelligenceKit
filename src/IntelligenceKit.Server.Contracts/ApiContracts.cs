@@ -223,3 +223,15 @@ public record PerformanceSummary(
     double P75Ms,
     double P95Ms,
     double FailureRate);
+
+/// <summary>User-written feedback about an event.</summary>
+public record FeedbackInfo(
+    Guid Id,
+    string ProjectId,
+    Guid EventId,
+    Guid? IssueId,
+    string Comments,
+    string? Name,
+    string? Email,
+    string? UserId,
+    DateTime CreatedAt);

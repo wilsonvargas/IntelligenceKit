@@ -156,3 +156,36 @@ public class PrivacyTests
         Assert.Equal("TAP", Assert.Single(buffer.Snapshot()).Message);
     }
 }
+
+public class FeedbackApiTests
+{
+    [Fact]
+    public async Task CaptureFeedback_LinksToLastEvent_AndSkipsScrubbing()
+    {
+        var log = new CallLog();
+        var store = new FakeEventStore(log);
+        var service = new IntelligenceKitService(
+            store, new FakeUploader(log), new IntelligenceOptions { ProjectId = "p" }, new FakeDeviceContextProvider(),
+            new FakeRuntimeContextProvider(), new BreadcrumbBuffer(new IntelligenceOptions()), new FakeLastScreenProvider(null), new FakeScreenshotStore());
+
+        Assert.Null(service.LastEventId);
+        await service.CaptureCrashAsync(new ExceptionInfo { Type = "Boom" });
+        var crashId = service.LastEventId!.Value;
+
+        await service.CaptureFeedbackAsync(new UserFeedback { EventId = crashId, Comments = "paid, then it closed", Email = "ana@example.com" });
+
+        var feedback = store.Saved.Last();
+        Assert.Equal(EventType.Feedback, feedback.EventType);
+        Assert.Equal(crashId, feedback.Feedback!.EventId);
+        Assert.Equal("ana@example.com", feedback.Feedback.Email);
+        Assert.Equal("p", feedback.ProjectId);
+    }
+
+    [Fact]
+    public async Task InterfaceDefaults_KeepOtherImplementationsWorking()
+    {
+        IIntelligenceKit kit = new RecordingKit(); // implements none of the new members
+        Assert.Null(kit.LastEventId);
+        await kit.CaptureFeedbackAsync(new UserFeedback { EventId = Guid.NewGuid(), Comments = "x" });
+    }
+}

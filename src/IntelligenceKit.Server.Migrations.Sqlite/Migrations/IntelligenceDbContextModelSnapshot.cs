@@ -177,6 +177,49 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                     b.ToTable("Sessions");
                 });
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.Feedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Comments")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("IssueId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.HasIndex("IssueId", "CreatedAt");
+
+                    b.HasIndex("ProjectId", "CreatedAt");
+
+                    b.ToTable("Feedback");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.Issue", b =>
                 {
                     b.Property<Guid>("Id")

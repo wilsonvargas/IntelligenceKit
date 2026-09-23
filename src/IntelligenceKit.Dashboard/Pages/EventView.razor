@@ -133,6 +133,8 @@ else
         </div>
     }
 
+    <FeedbackList Items="_feedback" />
+
     @if (_event.Exception is not null)
     {
         <h2 class="h5 mb-2">
@@ -195,6 +197,7 @@ else
     private bool _notFound;
     private bool _showScreenshot;
     private string? _error;
+    private IReadOnlyList<FeedbackInfo>? _feedback;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -202,10 +205,12 @@ else
         _notFound = false;
         _showScreenshot = false;
         _event = null;
+        _feedback = null;
         try
         {
             _event = await Api.GetEventAsync(Id);
             _notFound = _event is null;
+            _feedback = _event is null ? null : await Api.GetEventFeedbackAsync(Id);
         }
         catch (Exception ex)
         {

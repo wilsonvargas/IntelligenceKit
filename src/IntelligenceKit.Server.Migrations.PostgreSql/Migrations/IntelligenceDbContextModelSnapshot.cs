@@ -182,6 +182,49 @@ namespace IntelligenceKit.Server.Migrations.PostgreSql.Migrations
                     b.ToTable("Sessions");
                 });
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.Feedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comments")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("IssueId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId");
+
+                    b.HasIndex("IssueId", "CreatedAt");
+
+                    b.HasIndex("ProjectId", "CreatedAt");
+
+                    b.ToTable("Feedback");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.Issue", b =>
                 {
                     b.Property<Guid>("Id")

@@ -97,6 +97,20 @@ public class IntelligenceOptions
     public TimeSpan PerformanceFlushInterval { get; set; } = TimeSpan.FromSeconds(60);
 
     /// <summary>
+    /// On the next launch after a crash, ask the user what they were doing and send
+    /// the answer linked to the crash (platform SDKs with UI). Off by default.
+    /// </summary>
+    public bool EnableCrashFeedbackPrompt { get; set; }
+
+    public string CrashFeedbackTitle { get; set; } = "The app closed unexpectedly";
+
+    public string CrashFeedbackMessage { get; set; } = "Tell us what you were doing so we can fix it (optional).";
+
+    public string CrashFeedbackAccept { get; set; } = "Send";
+
+    public string CrashFeedbackCancel { get; set; } = "Skip";
+
+    /// <summary>
     /// Last chance to modify or drop an event before it is stored and sent. Runs
     /// after enrichment and before PII scrubbing. Return null to drop the event. If
     /// the callback throws, the event is sent unmodified. Also runs for crashes

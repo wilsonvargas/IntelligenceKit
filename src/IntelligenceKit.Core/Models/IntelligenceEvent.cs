@@ -70,4 +70,7 @@ public class IntelligenceEvent
 
     /// <summary>Batched timings. Only set on <see cref="EventType.Performance"/> events sent by the SDK.</summary>
     public List<PerformanceSpan>? Spans { get; set; }
+
+    /// <summary>Only set on <see cref="EventType.Feedback"/> events.</summary>
+    public UserFeedback? Feedback { get; set; }
 }

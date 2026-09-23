@@ -25,6 +25,13 @@ namespace Sample.Maui
                     // Opt-in: capture the last screen and attach it to crashes.
                     // (Off by default because screenshots can contain personal data.)
                     options.EnableScreenCapture = true;
+
+                    // After a crash, ask on next launch what the user was doing.
+                    options.EnableCrashFeedbackPrompt = true;
+                    options.CrashFeedbackTitle = "La app se cerró inesperadamente";
+                    options.CrashFeedbackMessage = "¿Qué estabas haciendo? (opcional)";
+                    options.CrashFeedbackAccept = "Enviar";
+                    options.CrashFeedbackCancel = "Omitir";
                 })
                 .ConfigureFonts(fonts =>
                 {

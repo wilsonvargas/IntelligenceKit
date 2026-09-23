@@ -37,4 +37,16 @@ public interface IIntelligenceKit
     /// next launch. Avoids blocking the crashing thread on a network call.
     /// </summary>
     Task CaptureCrashAsync(ExceptionInfo exception);
+
+    /// <summary>
+    /// Id of the most recent exception/crash/log event captured in this process,
+    /// to attach <see cref="CaptureFeedbackAsync"/> to. Null when none yet.
+    /// </summary>
+    Guid? LastEventId => null;
+
+    /// <summary>
+    /// Sends what the user says happened, linked to <see cref="UserFeedback.EventId"/>.
+    /// Default implementation does nothing (keeps third-party implementations compiling).
+    /// </summary>
+    Task CaptureFeedbackAsync(UserFeedback feedback) => Task.CompletedTask;
 }

@@ -143,6 +143,14 @@ public class ApiClient(HttpClient http)
                ?? Array.Empty<PerformanceSummary>();
     }
 
+    public async Task<IReadOnlyList<FeedbackInfo>> GetIssueFeedbackAsync(Guid issueId, CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IReadOnlyList<FeedbackInfo>>($"/issues/{issueId}/feedback", JsonOptions, ct)
+           ?? Array.Empty<FeedbackInfo>();
+
+    public async Task<IReadOnlyList<FeedbackInfo>> GetEventFeedbackAsync(Guid eventId, CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IReadOnlyList<FeedbackInfo>>($"/events/{eventId}/feedback", JsonOptions, ct)
+           ?? Array.Empty<FeedbackInfo>();
+
     // Alerts (admin-only) ---------------------------------------------------
 
     public async Task<IReadOnlyList<AlertRuleInfo>> GetAlertRulesAsync(CancellationToken ct = default)

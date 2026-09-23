@@ -110,6 +110,8 @@ else
         </div>
     </div>
 
+    <FeedbackList Items="_feedback" ShowEventLink="true" />
+
     <div class="d-flex align-items-center justify-content-between mb-2">
         <h2 class="h6 mb-0">Occurrences</h2>
         <a class="btn btn-sm btn-outline-primary" href="@($"/events/{_issue.LastEventId}")">Open latest event</a>
@@ -173,6 +175,7 @@ else
     private int _skip;
     private string? _error;
     private string? _triageError;
+    private IReadOnlyList<FeedbackInfo>? _feedback;
     private string? _resolveRelease;
     private string? _assignee;
     private bool _saving;
@@ -185,6 +188,7 @@ else
         _error = null;
         _issue = null;
         _events = null;
+        _feedback = null;
         try
         {
             _issue = await Api.GetIssueAsync(Id);
@@ -195,6 +199,7 @@ else
             }
             _assignee = _issue.AssignedTo;
             await LoadEventsAsync();
+            _feedback = await Api.GetIssueFeedbackAsync(Id);
         }
         catch (Exception ex)
         {

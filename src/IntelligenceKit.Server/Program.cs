@@ -9,6 +9,7 @@ using IntelligenceKit.Server.Alerts;
 using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
+using IntelligenceKit.Server.Feedback;
 using IntelligenceKit.Server.Ingest;
 using IntelligenceKit.Server.Performance;
 using IntelligenceKit.Server.Projects;
@@ -177,6 +178,16 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
             p.ProjectId == intelligenceEvent.ProjectId && p.ProjectKey == projectKey);
         if (!known)
             return Results.NotFound(new { error = "Unknown project. Register it via POST /admin/projects." });
+    }
+
+    // User feedback about an earlier event.
+    if (intelligenceEvent.EventType == EventType.Feedback)
+    {
+        if (intelligenceEvent.Feedback is not { EventId: var fid, Comments: var comments } || fid == Guid.Empty || string.IsNullOrWhiteSpace(comments))
+            return Results.BadRequest("Feedback events need 'feedback.eventId' and 'feedback.comments'.");
+
+        await FeedbackEndpoints.IngestAsync(db, intelligenceEvent);
+        return Results.Accepted();
     }
 
     // SDK performance batches are stored as spans, not issues.
@@ -620,6 +631,7 @@ app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext
 app.MapSessionEndpoints();
 app.MapReleaseEndpoints();
 app.MapPerformanceEndpoints();
+app.MapFeedbackEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 app.MapSymbolEndpoints(AdminOnly);
 

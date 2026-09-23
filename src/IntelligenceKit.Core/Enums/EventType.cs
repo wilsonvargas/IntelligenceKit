@@ -16,5 +16,8 @@ public enum EventType
     /// as release-health data instead of an issue. Appended last so the numeric
     /// values of the existing members stay stable on the wire.
     /// </summary>
-    Session
+    Session,
+
+    /// <summary>User-written feedback about an earlier event (see <see cref="Models.UserFeedback"/>).</summary>
+    Feedback
 }

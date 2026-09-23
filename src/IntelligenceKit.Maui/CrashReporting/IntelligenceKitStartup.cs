@@ -28,6 +28,9 @@ internal sealed class IntelligenceKitStartup : IMauiInitializeService
         // Begin the first session (only registered when auto session tracking is on).
         _ = services.GetService<ISessionTracker>()?.StartAsync();
 
+        // Ask about last session's crash (no-op unless EnableCrashFeedbackPrompt).
+        services.GetRequiredService<CrashFeedbackPrompt>().Start();
+
         // Start watching for a frozen UI (only registered when ANR detection is on).
         services.GetService<UiThreadWatchdog>()?.Start();
 

@@ -25,6 +25,7 @@ public class IntelligenceKitService : IIntelligenceKit
     // Mutable per-session scope. This service is a singleton, so these carry
     // across events until changed.
     private volatile string? _userId;
+    private Guid? _lastEventId;
     private readonly ConcurrentDictionary<string, string> _tags = new();
 
     public IntelligenceKitService(
@@ -81,6 +82,23 @@ public class IntelligenceKitService : IIntelligenceKit
         // Store-and-forward: persist first (durable even if the app dies now),
         // then opportunistically drain the queue to the server.
         await _store.SaveAsync(processed);
+        _lastEventId = processed.Id;
+        await _uploader.FlushAsync();
+    }
+
+    public Guid? LastEventId => _lastEventId;
+
+    public async Task CaptureFeedbackAsync(UserFeedback feedback)
+    {
+        if (feedback.EventId == Guid.Empty || string.IsNullOrWhiteSpace(feedback.Comments))
+            return;
+
+        // Written by the user on purpose: no sampling, hooks or scrubbing.
+        var e = new IntelligenceEvent { EventType = EventType.Feedback, Feedback = feedback };
+        EventContext.Stamp(e, _options, _device);
+        e.UserId = IntelligenceScope.Current?.UserId ?? _userId;
+
+        await _store.SaveAsync(e);
         await _uploader.FlushAsync();
     }
 
@@ -106,6 +124,7 @@ public class IntelligenceKitService : IIntelligenceKit
         // Only attach the screenshot for events that will actually be sent.
         await AttachScreenshotAsync(processed);
         await _store.SaveAsync(processed);
+        _lastEventId = processed.Id;
         await _uploader.FlushAsync();
     }
 
@@ -193,6 +212,8 @@ public class IntelligenceKitService : IIntelligenceKit
             return;
         }
         intelligenceEvent = processed;
+
+        _lastEventId = intelligenceEvent.Id;
 
         // Persist only — no flush. The process is dying; the uploader picks this
         // up on the next launch. Both writes are fast local writes; the screenshot

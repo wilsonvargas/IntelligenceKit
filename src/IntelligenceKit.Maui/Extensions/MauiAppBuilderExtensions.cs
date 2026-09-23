@@ -86,6 +86,7 @@ public static class MauiAppBuilderExtensions
         // Crash reporting + startup work (register handlers, initial flush,
         // flush on reconnect). Activated automatically; no host-app code needed.
         builder.Services.AddSingleton<ICrashReporter, CrashReporter>();
+        builder.Services.AddSingleton<CrashFeedbackPrompt>();
         builder.Services.AddSingleton<IMauiInitializeService, IntelligenceKitStartup>();
 
         return builder;
