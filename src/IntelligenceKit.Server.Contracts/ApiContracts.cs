@@ -294,3 +294,15 @@ public record DistributionValue(string Value, int Count, double Share);
 
 /// <summary>Distributions of an issue over its latest <c>SampledEvents</c> events.</summary>
 public record IssueDistributions(int SampledEvents, int AffectedUsers, IReadOnlyList<Distribution> Distributions);
+
+/// <summary>A user (opt-in <c>SetUser</c> id) affected by an issue.</summary>
+public record AffectedUser(string UserId, int Events, DateTime FirstSeen, DateTime LastSeen);
+
+/// <summary>Everything one user ran into: issues, sessions and their latest events.</summary>
+public record UserTimeline(
+    string UserId,
+    int TotalEvents,
+    int Sessions,
+    int CrashedSessions,
+    IReadOnlyList<IssueSummary> Issues,
+    IReadOnlyList<EventSummary> Events);

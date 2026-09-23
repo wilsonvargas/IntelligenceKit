@@ -112,6 +112,20 @@ else
 
     <DistributionsPanel Data="_distributions" />
 
+    @if (_users is { Count: > 0 })
+    {
+        <h2 class="h6 mb-2">Affected users</h2>
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            @foreach (var u in _users)
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="@($"/users/{Uri.EscapeDataString(u.UserId)}?projectId={Uri.EscapeDataString(_issue.ProjectId)}")"
+                   title="First seen @u.FirstSeen.ToLocalTime().ToString("g") · last @u.LastSeen.ToLocalTime().ToString("g")">
+                    &#128100; @u.UserId <span class="badge text-bg-light border ms-1">@u.Events</span>
+                </a>
+            }
+        </div>
+    }
+
     <FeedbackList Items="_feedback" ShowEventLink="true" />
 
     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -179,6 +193,7 @@ else
     private string? _triageError;
     private IReadOnlyList<FeedbackInfo>? _feedback;
     private IssueDistributions? _distributions;
+    private IReadOnlyList<AffectedUser>? _users;
     private string? _resolveRelease;
     private string? _assignee;
     private bool _saving;
@@ -193,6 +208,7 @@ else
         _events = null;
         _feedback = null;
         _distributions = null;
+        _users = null;
         try
         {
             _issue = await Api.GetIssueAsync(Id);
@@ -205,6 +221,7 @@ else
             await LoadEventsAsync();
             _feedback = await Api.GetIssueFeedbackAsync(Id);
             _distributions = await Api.GetIssueDistributionsAsync(Id);
+            _users = await Api.GetIssueUsersAsync(Id);
         }
         catch (Exception ex)
         {

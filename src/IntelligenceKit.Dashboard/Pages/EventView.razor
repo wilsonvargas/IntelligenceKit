@@ -41,7 +41,15 @@ else
                         @Field("Project", _event.ProjectId)
                         @Field("Environment", _event.Environment)
                         @Field("Release", _event.Release)
-                        @Field("User", _event.UserId)
+                        @if (!string.IsNullOrWhiteSpace(_event.UserId))
+                        {
+                            <dt class="col-sm-4 text-muted fw-normal">User</dt>
+                            <dd class="col-sm-8"><a href="@($"/users/{Uri.EscapeDataString(_event.UserId)}?projectId={Uri.EscapeDataString(_event.ProjectId)}")">@_event.UserId</a></dd>
+                        }
+                        else
+                        {
+                            @Field("User", null)
+                        }
                         @Field("Application", $"{_event.ApplicationName} {_event.ApplicationVersion}")
                         @Field("Platform", _event.Platform)
                         @Field("Operating system", _event.OperatingSystem)

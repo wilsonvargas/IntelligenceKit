@@ -139,6 +139,18 @@ public class ApiClient(HttpClient http)
                ?? Array.Empty<PerformanceSummary>();
     }
 
+    public async Task<IReadOnlyList<AffectedUser>> GetIssueUsersAsync(Guid issueId, CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IReadOnlyList<AffectedUser>>($"/issues/{issueId}/users?take=20", JsonOptions, ct)
+           ?? Array.Empty<AffectedUser>();
+
+    public async Task<UserTimeline?> GetUserTimelineAsync(string userId, string? projectId = null, CancellationToken ct = default)
+    {
+        var url = $"/users/{Uri.EscapeDataString(userId)}";
+        if (!string.IsNullOrWhiteSpace(projectId))
+            url += $"?projectId={Uri.EscapeDataString(projectId)}";
+        return await http.GetFromJsonAsync<UserTimeline>(url, JsonOptions, ct);
+    }
+
     public async Task<IssueDistributions?> GetIssueDistributionsAsync(Guid issueId, CancellationToken ct = default)
         => await http.GetFromJsonAsync<IssueDistributions>($"/issues/{issueId}/distributions", JsonOptions, ct);
 
