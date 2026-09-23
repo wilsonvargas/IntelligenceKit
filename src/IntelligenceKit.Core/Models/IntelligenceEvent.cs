@@ -57,6 +57,14 @@ public class IntelligenceEvent
 
     public Dictionary<string, object?> Data { get; set; } = new();
 
+    /// <summary>
+    /// Optional custom grouping. When set, events with the same values land in the
+    /// same issue regardless of their stack trace. Use <see cref="Diagnostics.EventFingerprint.DefaultToken"/>
+    /// ("{{ default }}") as one of the values to refine the default grouping instead
+    /// of replacing it, e.g. <c>["{{ default }}", tenantId]</c>.
+    /// </summary>
+    public List<string>? Fingerprint { get; set; }
+
     /// <summary>Session state. Only set on <see cref="EventType.Session"/> events.</summary>
     public SessionInfo? Session { get; set; }
 

@@ -71,6 +71,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<EventIngestor>();
 builder.Services.AddScoped<SessionIngestor>();
+builder.Services.AddScoped<IssueBackfill>();
 builder.Services.AddSingleton<SymbolCache>();
 builder.Services.AddScoped<Symbolicator>();
 
@@ -600,6 +601,10 @@ app.MapPost("/admin/projects/{id:guid}/rotate-key", async (Guid id, Intelligence
     return Results.Ok(new ProjectCredentials(
         project.Id, project.ProjectId, project.ProjectKey, project.Name, project.CreatedAt, readKey));
 }).RequireAuthorization(AdminOnly);
+
+// Groups events stored before issue grouping existed. Safe to re-run.
+app.MapPost("/admin/issues/backfill", async (IssueBackfill backfill, CancellationToken ct) =>
+    Results.Ok(await backfill.RunAsync(ct))).RequireAuthorization(AdminOnly);
 
 app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext db) =>
 {
