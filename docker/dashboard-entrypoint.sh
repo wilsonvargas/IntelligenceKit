@@ -7,6 +7,13 @@ set -eu
 : "${API_BASE_URL:=http://localhost:7099}"
 ROOT="/usr/share/nginx/html"
 
+# Platforms that wire services together by hostname (e.g. Render's fromService
+# "host") give a bare host; the browser needs a full URL.
+case "$API_BASE_URL" in
+  *://*) ;;
+  *) API_BASE_URL="https://${API_BASE_URL}" ;;
+esac
+
 cat > "${ROOT}/appsettings.json" <<EOF
 {
   "ApiBaseUrl": "${API_BASE_URL}"

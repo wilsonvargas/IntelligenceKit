@@ -42,3 +42,22 @@ public class TelemetryTests : IClassFixture<ServerAppFactory>
         Assert.Contains("ik_ingest_duration", body);
     }
 }
+
+public class ConnectionStringTests
+{
+    [Theory]
+    [InlineData("postgres://ik:p%40ss@db.example.com:6543/intelligence?sslmode=require",
+        "Host=db.example.com;Port=6543;Database=intelligence;Username=ik;Password=p@ss;SSL Mode=require")]
+    [InlineData("postgresql://ik@db/ik", "Host=db;Port=5432;Database=ik;Username=ik")]
+    [InlineData("Host=db;Database=ik", "Host=db;Database=ik")]
+    public void PostgresUrls_AreConverted(string input, string expected)
+        => Assert.Equal(expected, IntelligenceKit.Server.Hosting.ConnectionStrings.FromUrl(input));
+
+    [Fact]
+    public void SqliteDirectory_IsCreated()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "ik-sqlite-" + Guid.NewGuid().ToString("N"), "data");
+        IntelligenceKit.Server.Hosting.ConnectionStrings.EnsureSqliteDirectory($"Data Source={Path.Combine(dir, "ik.db")}");
+        Assert.True(Directory.Exists(dir));
+    }
+}

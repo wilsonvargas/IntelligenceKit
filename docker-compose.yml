@@ -1,7 +1,8 @@
 # IntelligenceKit — full self-hosted stack: PostgreSQL + ingest/query server +
-# dashboard. Copy .env.example to .env (at minimum set IK_READ_TOKEN), then:
+# dashboard. Copy .env.example to .env (at minimum set IK_READ_TOKEN), then either
 #
-#   docker compose up --build
+#   docker compose pull && docker compose up -d     # prebuilt images from GHCR
+#   docker compose up --build                       # or build from this checkout
 #
 # Dashboard:  http://localhost:${DASHBOARD_PORT:-8080}
 # API:        http://localhost:${SERVER_PORT:-7099}
@@ -24,6 +25,7 @@ services:
     restart: unless-stopped
 
   server:
+    image: ghcr.io/wilsonvargas/intelligencekit-server:${IK_VERSION:-latest}
     build:
       context: .
       dockerfile: docker/server.Dockerfile
@@ -42,6 +44,7 @@ services:
     restart: unless-stopped
 
   dashboard:
+    image: ghcr.io/wilsonvargas/intelligencekit-dashboard:${IK_VERSION:-latest}
     build:
       context: .
       dockerfile: docker/dashboard.Dockerfile

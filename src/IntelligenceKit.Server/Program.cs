@@ -54,8 +54,10 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
     {
         case "postgres":
         case "postgresql":
+            // Also accepts a postgres:// URL, or DATABASE_URL, as PaaS platforms provide.
             options.UseNpgsql(
-                connectionString ?? throw new InvalidOperationException("ConnectionStrings:Events is required for PostgreSql."),
+                IntelligenceKit.Server.Hosting.ConnectionStrings.PostgreSql(builder.Configuration)
+                    ?? throw new InvalidOperationException("ConnectionStrings:Events (or DATABASE_URL) is required for PostgreSql."),
                 x => x.MigrationsAssembly("IntelligenceKit.Server.Migrations.PostgreSql"));
             break;
 
@@ -68,7 +70,7 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 
         default:
             options.UseSqlite(
-                connectionString ?? "Data Source=intelligencekit.db",
+                IntelligenceKit.Server.Hosting.ConnectionStrings.EnsureSqliteDirectory(connectionString ?? "Data Source=intelligencekit.db"),
                 x => x.MigrationsAssembly("IntelligenceKit.Server.Migrations.Sqlite"));
             break;
     }

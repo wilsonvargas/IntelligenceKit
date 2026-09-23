@@ -1,0 +1,47 @@
+# Render Blueprint — one-click deploy of the full stack (server + dashboard +
+# managed PostgreSQL). Use the "Deploy to Render" button in the README, or
+# New > Blueprint in the Render dashboard and point it at this repository.
+#
+# After the first deploy, open the ik-server service's Environment tab to copy
+# the generated Auth__ReadToken: it is the admin token the dashboard asks for.
+databases:
+  - name: ik-db
+    databaseName: intelligencekit
+    user: intelligencekit
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: ik-server
+    runtime: docker
+    dockerfilePath: ./docker/server.Dockerfile
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health/ready
+    envVars:
+      - key: Database__Provider
+        value: PostgreSql
+      # Render hands out a postgres:// URL; the server converts it for Npgsql.
+      - key: ConnectionStrings__Events
+        fromDatabase:
+          name: ik-db
+          property: connectionString
+      - key: Auth__ReadToken
+        generateValue: true
+      # Public dashboard URL, for "open issue" links in alerts and tracker issues
+      # (e.g. https://ik-dashboard.onrender.com). Asked for when the Blueprint is created.
+      - key: Alerts__DashboardUrl
+        sync: false
+
+  - type: web
+    name: ik-dashboard
+    runtime: docker
+    dockerfilePath: ./docker/dashboard.Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      # Public URL of ik-server as the BROWSER reaches it (the dashboard is WASM),
+      # e.g. https://ik-server.onrender.com — shown on the ik-server page after
+      # the first deploy. Asked for when the Blueprint is created.
+      - key: API_BASE_URL
+        sync: false
