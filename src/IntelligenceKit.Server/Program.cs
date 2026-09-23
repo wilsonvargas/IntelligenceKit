@@ -19,10 +19,14 @@ using IntelligenceKit.Server.Retention;
 using IntelligenceKit.Server.Search;
 using IntelligenceKit.Server.Sessions;
 using IntelligenceKit.Server.Symbols;
+using IntelligenceKit.Server.Telemetry;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 const string DashboardCors = "dashboard";
 const string IngestRateLimit = "ingest";
@@ -71,6 +75,38 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 });
 
 builder.Services.AddOpenApi();
+
+// Health (/health/live, /health/ready) and the server's own metrics. Metrics are
+// exported via OpenTelemetry: Prometheus scrape endpoint at /metrics (on by
+// default, admin-token protected) and/or OTLP (metrics + traces) when
+// Telemetry:Otlp:Endpoint is set.
+builder.Services.AddSingleton<ServerMetrics>();
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag]);
+
+var prometheusEnabled = builder.Configuration.GetValue("Telemetry:Prometheus:Enabled", true);
+var otlpEndpoint = builder.Configuration["Telemetry:Otlp:Endpoint"];
+if (prometheusEnabled || !string.IsNullOrWhiteSpace(otlpEndpoint))
+{
+    var otel = builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("intelligencekit-server"))
+        .WithMetrics(metrics =>
+        {
+            metrics.AddMeter(ServerMetrics.MeterName)
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation();
+            if (prometheusEnabled)
+                metrics.AddPrometheusExporter();
+            if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                metrics.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+        });
+
+    if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+        otel.WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)));
+}
 builder.Services.AddSignalR();
 builder.Services.AddScoped<EventIngestor>();
 builder.Services.AddScoped<SessionIngestor>();
@@ -171,7 +207,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Ingest -----------------------------------------------------------------
-app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest request, IntelligenceDbContext db, EventIngestor ingestor, SessionIngestor sessions, IConfiguration config) =>
+app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest request, IntelligenceDbContext db, EventIngestor ingestor, SessionIngestor sessions, IConfiguration config, ServerMetrics metrics) =>
 {
     var projectKey = request.Headers["X-IntelligenceKit-Key"].ToString();
 
@@ -182,7 +218,10 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
         var known = await db.Projects.AsNoTracking().AnyAsync(p =>
             p.ProjectId == intelligenceEvent.ProjectId && p.ProjectKey == projectKey);
         if (!known)
+        {
+            metrics.EventRejected("unknown_project");
             return Results.NotFound(new { error = "Unknown project. Register it via POST /admin/projects." });
+        }
     }
 
     // User feedback about an earlier event.
@@ -192,6 +231,7 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
             return Results.BadRequest("Feedback events need 'feedback.eventId' and 'feedback.comments'.");
 
         await FeedbackEndpoints.IngestAsync(db, intelligenceEvent);
+        metrics.EventIngested("Feedback", intelligenceEvent.ProjectId);
         return Results.Accepted();
     }
 
@@ -199,6 +239,7 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
     if (intelligenceEvent.EventType == EventType.Performance && intelligenceEvent.Spans is { Count: > 0 })
     {
         await PerformanceEndpoints.IngestAsync(db, intelligenceEvent);
+        metrics.SpansIngested(intelligenceEvent.Spans.Count);
         return Results.Accepted();
     }
 
@@ -209,14 +250,32 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
             return Results.BadRequest("Session events need a 'session' payload.");
 
         await sessions.IngestAsync(intelligenceEvent);
+        metrics.SessionUpdate(intelligenceEvent.Session.Status.ToString());
         return Results.Accepted();
     }
 
     var result = await ingestor.IngestAsync(intelligenceEvent, projectKey);
-    return result.Duplicate
-        ? Results.Ok(new { Id = intelligenceEvent.Id })
-        : Results.Created($"/events/{result.Event!.Id}", new { result.Event.Id });
-}).RequireRateLimiting(IngestRateLimit);
+    if (result.Duplicate)
+        return Results.Ok(new { Id = intelligenceEvent.Id });
+
+    metrics.EventIngested(result.Event!.EventType, result.Event.ProjectId);
+    if (result.Change != IssueChange.Existing)
+        metrics.IssueChanged(result.Change.ToString());
+    return Results.Created($"/events/{result.Event.Id}", new { result.Event.Id });
+}).RequireRateLimiting(IngestRateLimit)
+  .AddEndpointFilter(async (context, next) =>
+  {
+      var started = System.Diagnostics.Stopwatch.GetTimestamp();
+      try
+      {
+          return await next(context);
+      }
+      finally
+      {
+          context.HttpContext.RequestServices.GetRequiredService<ServerMetrics>()
+              .IngestDuration(System.Diagnostics.Stopwatch.GetElapsedTime(started));
+      }
+  });
 
 // Query ------------------------------------------------------------------
 // Search: every EventFilter field is an optional query parameter (q, level,
@@ -648,6 +707,16 @@ app.MapExportEndpoints();
 app.MapIssueTrackerEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 app.MapSymbolEndpoints(AdminOnly);
+
+app.MapHealthEndpoints();
+if (prometheusEnabled)
+{
+    // Tags carry project ids, so the scrape endpoint is admin-only unless opted out
+    // (Prometheus supports bearer tokens: authorization.credentials in scrape_configs).
+    var scrape = app.MapPrometheusScrapingEndpoint("/metrics");
+    if (app.Configuration.GetValue("Telemetry:Prometheus:RequireAuth", true))
+        scrape.RequireAuthorization(AdminOnly);
+}
 
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 

@@ -15,13 +15,16 @@ public sealed class AlertDispatcher : BackgroundService
     private readonly AlertSender _sender;
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<AlertDispatcher> _logger;
+    private readonly Telemetry.ServerMetrics _metrics;
 
-    public AlertDispatcher(AlertQueue queue, AlertSender sender, IServiceScopeFactory scopes, ILogger<AlertDispatcher> logger)
+    public AlertDispatcher(AlertQueue queue, AlertSender sender, IServiceScopeFactory scopes, ILogger<AlertDispatcher> logger,
+        Telemetry.ServerMetrics metrics)
     {
         _queue = queue;
         _sender = sender;
         _scopes = scopes;
         _logger = logger;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -60,6 +63,8 @@ public sealed class AlertDispatcher : BackgroundService
             error = ex.Message;
             _logger.LogWarning(ex, "Alert '{Rule}' via {Channel} failed.", job.RuleName, job.Channel);
         }
+
+        _metrics.AlertDelivered(job.Channel, error is null);
 
         try
         {
