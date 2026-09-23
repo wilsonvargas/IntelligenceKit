@@ -162,6 +162,33 @@ public class ApiClient(HttpClient http)
         => await http.GetFromJsonAsync<IReadOnlyList<FeedbackInfo>>($"/events/{eventId}/feedback", JsonOptions, ct)
            ?? Array.Empty<FeedbackInfo>();
 
+    // Project administration (admin-only) --------------------------------
+
+    public async Task<IReadOnlyList<ProjectInfo>> GetRegisteredProjectsAsync(CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IReadOnlyList<ProjectInfo>>("/admin/projects", JsonOptions, ct)
+           ?? Array.Empty<ProjectInfo>();
+
+    /// <summary>Registers a project; returns its one-time credentials, or the server's error (400/409).</summary>
+    public async Task<(ProjectCredentials? Credentials, string? Error)> CreateProjectAsync(CreateProjectRequest request, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("/admin/projects", request, JsonOptions, ct);
+        if (response.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Conflict)
+            return (null, (await response.Content.ReadAsStringAsync(ct)).Trim('"'));
+
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ProjectCredentials>(JsonOptions, ct), null);
+    }
+
+    public async Task<ProjectCredentials?> RotateProjectKeyAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await http.PostAsync($"/admin/projects/{id}/rotate-key", null, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ProjectCredentials>(JsonOptions, ct);
+    }
+
+    public async Task DeleteProjectAsync(Guid id, CancellationToken ct = default)
+        => (await http.DeleteAsync($"/admin/projects/{id}", ct)).EnsureSuccessStatusCode();
+
     // Alerts (admin-only) ---------------------------------------------------
 
     public async Task<IReadOnlyList<AlertRuleInfo>> GetAlertRulesAsync(CancellationToken ct = default)
