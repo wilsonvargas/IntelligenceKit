@@ -24,6 +24,9 @@ internal sealed class IntelligenceKitStartup : IMauiInitializeService
         // Begin proactive screen capture (no-op unless EnableScreenCapture is set).
         services.GetRequiredService<ScreenCaptureService>().Start();
 
+        // Begin the first session (only registered when auto session tracking is on).
+        _ = services.GetService<ISessionTracker>()?.StartAsync();
+
         var uploader = services.GetRequiredService<IEventUploader>();
 
         // Upload events persisted before this launch (e.g. a crash last session).

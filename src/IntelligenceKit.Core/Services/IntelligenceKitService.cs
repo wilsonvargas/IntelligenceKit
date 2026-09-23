@@ -18,6 +18,7 @@ public class IntelligenceKitService : IIntelligenceKit
     private readonly IBreadcrumbBuffer _breadcrumbs;
     private readonly ILastScreenProvider _lastScreen;
     private readonly IScreenshotStore _screenshots;
+    private readonly ISessionTracker? _sessions;
 
     // Mutable per-session scope. This service is a singleton, so these carry
     // across events until changed.
@@ -33,7 +34,27 @@ public class IntelligenceKitService : IIntelligenceKit
         IBreadcrumbBuffer breadcrumbs,
         ILastScreenProvider lastScreen,
         IScreenshotStore screenshots)
+        : this(store, uploader, options, device, runtime, breadcrumbs, lastScreen, screenshots, sessions: null)
     {
+    }
+
+    /// <summary>
+    /// Full constructor. <paramref name="sessions"/> is optional: when supplied,
+    /// handled errors are counted against the current session and a fatal crash
+    /// marks it crashed (release health).
+    /// </summary>
+    public IntelligenceKitService(
+        IEventStore store,
+        IEventUploader uploader,
+        IntelligenceOptions options,
+        IDeviceContextProvider device,
+        IRuntimeContextProvider runtime,
+        IBreadcrumbBuffer breadcrumbs,
+        ILastScreenProvider lastScreen,
+        IScreenshotStore screenshots,
+        ISessionTracker? sessions)
+    {
+        _sessions = sessions;
         _store = store;
         _uploader = uploader;
         _options = options;
@@ -61,6 +82,8 @@ public class IntelligenceKitService : IIntelligenceKit
 
     public async Task TrackExceptionAsync(ExceptionInfo exception)
     {
+        _sessions?.RecordError();
+
         var exceptionEvent = BuildExceptionEvent(exception);
         await AttachScreenshotAsync(exceptionEvent);
         await TrackAsync(exceptionEvent);
@@ -99,7 +122,11 @@ public class IntelligenceKitService : IIntelligenceKit
         });
     }
 
-    public void SetUser(string? userId) => _userId = userId;
+    public void SetUser(string? userId)
+    {
+        _userId = userId;
+        _sessions?.SetUser(userId);
+    }
 
     public void SetTag(string key, string? value)
     {
@@ -122,6 +149,20 @@ public class IntelligenceKitService : IIntelligenceKit
         // bytes were already captured proactively (never on this dying thread).
         await _store.SaveAsync(intelligenceEvent);
         await AttachScreenshotAsync(intelligenceEvent);
+
+        // Close the session as crashed (also persist-only), after the crash itself
+        // is safely stored.
+        if (_sessions is not null)
+        {
+            try
+            {
+                await _sessions.CaptureCrashAsync();
+            }
+            catch
+            {
+                // Release health is best-effort; the crash event is what matters.
+            }
+        }
     }
 
     /// <summary>

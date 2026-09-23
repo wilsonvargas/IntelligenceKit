@@ -10,6 +10,7 @@ using IntelligenceKit.Maui.Services;
 using IntelligenceKit.Maui.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Hosting;
+using Microsoft.Maui.LifecycleEvents;
 
 namespace IntelligenceKit.Maui.Extensions;
 
@@ -39,6 +40,14 @@ public static class MauiAppBuilderExtensions
         builder.Services.AddSingleton(options);
 
         builder.Services.AddHttpClient<IIntelligenceClient, HttpIntelligenceClient>();
+
+        // Release health: session tracking driven by the app lifecycle.
+        builder.Services.AddSingleton<IInstallationIdProvider, MauiInstallationIdProvider>();
+        if (options.EnableAutoSessionTracking)
+        {
+            builder.Services.AddSingleton<ISessionTracker, SessionTracker>();
+            builder.ConfigureLifecycleEvents(RegisterSessionLifecycle);
+        }
         builder.Services.AddSingleton<IIntelligenceKit, IntelligenceKitService>();
         builder.Services.AddSingleton<IDeviceContextProvider, MauiDeviceContextProvider>();
 
@@ -65,4 +74,24 @@ public static class MauiAppBuilderExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Pauses the session when the app goes to the background and resumes (or
+    /// restarts, after <c>SessionTimeout</c>) it when the app comes back.
+    /// </summary>
+    private static void RegisterSessionLifecycle(ILifecycleBuilder events)
+    {
+#if ANDROID
+        events.AddAndroid(android => android
+            .OnStart(activity => Sessions()?.ResumeAsync())
+            .OnStop(activity => Sessions()?.PauseAsync()));
+#elif IOS || MACCATALYST
+        events.AddiOS(ios => ios
+            .WillEnterForeground(application => Sessions()?.ResumeAsync())
+            .DidEnterBackground(application => Sessions()?.PauseAsync()));
+#endif
+    }
+
+    private static ISessionTracker? Sessions()
+        => IPlatformApplication.Current?.Services.GetService<ISessionTracker>();
 }

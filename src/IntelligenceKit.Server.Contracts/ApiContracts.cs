@@ -165,3 +165,22 @@ public record AlertNotificationInfo(
     bool? Success,
     string? Error,
     DateTime? DeliveredAt);
+
+/// <summary>
+/// Crash-free rates for a window. Rates are 0–1 and null when there were no
+/// sessions. <c>AbnormalSessions</c> are sessions that stopped reporting while in
+/// the foreground (e.g. killed by the OS or a native crash the SDK couldn't see).
+/// </summary>
+public record CrashFreeStats(
+    int Sessions,
+    int CrashedSessions,
+    int ErroredSessions,
+    int AbnormalSessions,
+    double? CrashFreeSessionRate,
+    int Users,
+    int CrashedUsers,
+    double? CrashFreeUserRate,
+    IReadOnlyList<CrashFreeDay> Daily);
+
+/// <summary>One UTC day of the crash-free series.</summary>
+public record CrashFreeDay(DateTime Date, int Sessions, int CrashedSessions, double? CrashFreeSessionRate);

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using IntelligenceKit.Core.Enums;
 using IntelligenceKit.Core.Models;
 using IntelligenceKit.Server;
 using IntelligenceKit.Server.Alerts;
@@ -11,6 +12,7 @@ using IntelligenceKit.Server.Data;
 using IntelligenceKit.Server.Ingest;
 using IntelligenceKit.Server.Projects;
 using IntelligenceKit.Server.Retention;
+using IntelligenceKit.Server.Sessions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
@@ -65,6 +67,7 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<EventIngestor>();
+builder.Services.AddScoped<SessionIngestor>();
 
 // Alerts: rules are evaluated at ingest (AlertEvaluator) and delivered off the
 // request path by a background dispatcher, so slow webhooks never delay ingest.
@@ -156,7 +159,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Ingest -----------------------------------------------------------------
-app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest request, IntelligenceDbContext db, EventIngestor ingestor, IConfiguration config) =>
+app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest request, IntelligenceDbContext db, EventIngestor ingestor, SessionIngestor sessions, IConfiguration config) =>
 {
     var projectKey = request.Headers["X-IntelligenceKit-Key"].ToString();
 
@@ -168,6 +171,16 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
             p.ProjectId == intelligenceEvent.ProjectId && p.ProjectKey == projectKey);
         if (!known)
             return Results.NotFound(new { error = "Unknown project. Register it via POST /admin/projects." });
+    }
+
+    // Session updates feed release health, not issues.
+    if (intelligenceEvent.EventType == EventType.Session)
+    {
+        if (intelligenceEvent.Session is null)
+            return Results.BadRequest("Session events need a 'session' payload.");
+
+        await sessions.IngestAsync(intelligenceEvent);
+        return Results.Accepted();
     }
 
     var result = await ingestor.IngestAsync(intelligenceEvent, projectKey);
@@ -576,6 +589,7 @@ app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext
     return Results.NoContent();
 }).RequireAuthorization(AdminOnly);
 
+app.MapSessionEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();

@@ -101,6 +101,19 @@ public class ApiClient(HttpClient http)
                $"/issues/{id}/events?skip={skip}&take={take}", JsonOptions, ct)
            ?? new PagedResult<EventSummary>(0, skip, take, Array.Empty<EventSummary>());
 
+    public async Task<CrashFreeStats?> GetCrashFreeAsync(
+        string? projectId = null, string? environment = null, string? release = null, int days = 14, CancellationToken ct = default)
+    {
+        var url = $"/stats/crash-free?days={days}";
+        if (!string.IsNullOrWhiteSpace(projectId))
+            url += $"&projectId={Uri.EscapeDataString(projectId)}";
+        if (!string.IsNullOrWhiteSpace(environment))
+            url += $"&environment={Uri.EscapeDataString(environment)}";
+        if (!string.IsNullOrWhiteSpace(release))
+            url += $"&release={Uri.EscapeDataString(release)}";
+        return await http.GetFromJsonAsync<CrashFreeStats>(url, JsonOptions, ct);
+    }
+
     // Alerts (admin-only) ---------------------------------------------------
 
     public async Task<IReadOnlyList<AlertRuleInfo>> GetAlertRulesAsync(CancellationToken ct = default)

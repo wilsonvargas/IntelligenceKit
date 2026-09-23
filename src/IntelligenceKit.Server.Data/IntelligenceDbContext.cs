@@ -17,6 +17,8 @@ public class IntelligenceDbContext : DbContext
 
     public DbSet<Project> Projects => Set<Project>();
 
+    public DbSet<AppSession> Sessions => Set<AppSession>();
+
     public DbSet<AlertRule> AlertRules => Set<AlertRule>();
 
     public DbSet<AlertNotification> AlertNotifications => Set<AlertNotification>();
@@ -50,6 +52,13 @@ public class IntelligenceDbContext : DbContext
         project.HasIndex(p => p.ReadKeyHash);
         // Ingest validates the (ProjectId, ProjectKey) pair.
         project.HasIndex(p => new { p.ProjectId, p.ProjectKey });
+
+        var session = modelBuilder.Entity<AppSession>();
+        session.HasKey(s => s.Id);
+        session.Property(s => s.Status).HasMaxLength(16);
+        // Release-health reads: a project's sessions in a time window, per release.
+        session.HasIndex(s => new { s.ProjectId, s.Started });
+        session.HasIndex(s => new { s.ProjectId, s.Release });
 
         var rule = modelBuilder.Entity<AlertRule>();
         rule.HasKey(r => r.Id);

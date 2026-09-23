@@ -119,6 +119,64 @@ namespace IntelligenceKit.Server.Migrations.Sqlite.Migrations
                     b.ToTable("AlertRules");
                 });
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.AppSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DistinctId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("DurationSeconds")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Errors")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastUpdate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Release")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Started")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Release");
+
+                    b.HasIndex("ProjectId", "Started");
+
+                    b.ToTable("Sessions");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.Issue", b =>
                 {
                     b.Property<Guid>("Id")

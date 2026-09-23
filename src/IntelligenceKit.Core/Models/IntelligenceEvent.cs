@@ -56,4 +56,7 @@ public class IntelligenceEvent
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
     public Dictionary<string, object?> Data { get; set; } = new();
+
+    /// <summary>Session state. Only set on <see cref="EventType.Session"/> events.</summary>
+    public SessionInfo? Session { get; set; }
 }

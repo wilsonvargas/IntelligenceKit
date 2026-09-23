@@ -124,6 +124,64 @@ namespace IntelligenceKit.Server.Migrations.PostgreSql.Migrations
                     b.ToTable("AlertRules");
                 });
 
+            modelBuilder.Entity("IntelligenceKit.Server.Data.AppSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DistinctId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<double>("DurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Errors")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("LastUpdate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Release")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("Started")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Release");
+
+                    b.HasIndex("ProjectId", "Started");
+
+                    b.ToTable("Sessions");
+                });
+
             modelBuilder.Entity("IntelligenceKit.Server.Data.Issue", b =>
                 {
                     b.Property<Guid>("Id")

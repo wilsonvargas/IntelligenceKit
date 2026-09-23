@@ -52,4 +52,16 @@ public class IntelligenceOptions
     public bool EnableCrashReporting { get; set; } = true;
 
     public bool EnableDeviceInfo { get; set; } = true;
+
+    /// <summary>
+    /// Track app sessions automatically (start at launch, pause/resume with the app
+    /// lifecycle) so the dashboard can show crash-free sessions/users per release.
+    /// </summary>
+    public bool EnableAutoSessionTracking { get; set; } = true;
+
+    /// <summary>
+    /// How long the app may stay in the background before returning to it starts a
+    /// new session instead of continuing the previous one.
+    /// </summary>
+    public TimeSpan SessionTimeout { get; set; } = TimeSpan.FromSeconds(30);
 }
