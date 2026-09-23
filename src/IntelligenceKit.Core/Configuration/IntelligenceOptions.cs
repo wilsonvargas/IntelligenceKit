@@ -78,6 +78,18 @@ public class IntelligenceOptions
     public TimeSpan AnrThreshold { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Measure app start, page load and (with the HTTP handler) request durations,
+    /// and ship them as batched performance spans.
+    /// </summary>
+    public bool EnablePerformanceMonitoring { get; set; } = true;
+
+    /// <summary>Fraction (0.0–1.0) of performance spans to keep.</summary>
+    public double PerformanceSampleRate { get; set; } = 1.0;
+
+    /// <summary>How often buffered spans are shipped (also on background / every 50 spans).</summary>
+    public TimeSpan PerformanceFlushInterval { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
     /// Last chance to modify or drop an event before it is stored and sent. Runs
     /// after enrichment and before PII scrubbing. Return null to drop the event. If
     /// the callback throws, the event is sent unmodified. Also runs for crashes

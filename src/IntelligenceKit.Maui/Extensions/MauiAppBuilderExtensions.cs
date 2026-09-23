@@ -46,6 +46,11 @@ public static class MauiAppBuilderExtensions
         if (options.EnableAutoSessionTracking)
             builder.Services.AddSingleton<ISessionTracker, SessionTracker>();
 
+        // Performance: app start / page load timing, plus HTTP spans for clients that
+        // opt in via AddIntelligenceKitHandler().
+        if (options.EnablePerformanceMonitoring)
+            builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
+
         // Frozen-UI (ANR) detection: a background watchdog pinging the main thread.
         if (options.EnableAnrDetection)
         {
@@ -53,7 +58,7 @@ public static class MauiAppBuilderExtensions
             builder.Services.AddSingleton<UiThreadWatchdog>();
         }
 
-        if (options.EnableAutoSessionTracking || options.EnableAnrDetection)
+        if (options.EnableAutoSessionTracking || options.EnableAnrDetection || options.EnablePerformanceMonitoring)
             builder.ConfigureLifecycleEvents(RegisterAppLifecycle);
         builder.Services.AddSingleton<IIntelligenceKit, IntelligenceKitService>();
         builder.Services.AddSingleton<IDeviceContextProvider, MauiDeviceContextProvider>();
@@ -112,5 +117,6 @@ public static class MauiAppBuilderExtensions
         var services = IPlatformApplication.Current?.Services;
         services?.GetService<UiThreadWatchdog>()?.Pause();
         _ = services?.GetService<ISessionTracker>()?.PauseAsync();
+        _ = services?.GetService<IPerformanceMonitor>()?.FlushAsync();
     }
 }

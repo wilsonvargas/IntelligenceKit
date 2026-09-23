@@ -21,6 +21,8 @@ public class IntelligenceDbContext : DbContext
 
     public DbSet<SymbolFile> Symbols => Set<SymbolFile>();
 
+    public DbSet<StoredSpan> Spans => Set<StoredSpan>();
+
     public DbSet<AlertRule> AlertRules => Set<AlertRule>();
 
     public DbSet<AlertNotification> AlertNotifications => Set<AlertNotification>();
@@ -68,6 +70,12 @@ public class IntelligenceDbContext : DbContext
         symbol.Property(s => s.Kind).HasMaxLength(32);
         symbol.Property(s => s.Key).HasMaxLength(300);
         symbol.HasIndex(s => new { s.Kind, s.Key });
+
+        var span = modelBuilder.Entity<StoredSpan>();
+        span.HasKey(s => s.Id);
+        span.Property(s => s.Operation).HasMaxLength(64);
+        span.Property(s => s.Name).HasMaxLength(300);
+        span.HasIndex(s => new { s.ProjectId, s.Start });
 
         var rule = modelBuilder.Entity<AlertRule>();
         rule.HasKey(r => r.Id);

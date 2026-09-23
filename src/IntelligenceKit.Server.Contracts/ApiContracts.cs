@@ -212,3 +212,14 @@ public record SymbolFileInfo(Guid Id, string Kind, string Key, string FileName, 
 
 /// <summary>Outcome for one file of a symbol upload; <c>Error</c> set when it was skipped.</summary>
 public record SymbolUploadResult(string FileName, string? Kind, string? Key, string? Error);
+
+/// <summary>Latency summary for one (operation, name) — e.g. one page or one endpoint.</summary>
+public record PerformanceSummary(
+    string Operation,
+    string Name,
+    int Count,
+    double AvgMs,
+    double P50Ms,
+    double P75Ms,
+    double P95Ms,
+    double FailureRate);

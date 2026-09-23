@@ -58,6 +58,10 @@ public sealed class RetentionSweeper
             .Where(i => i.LastSeen < cutoff)
             .ExecuteDeleteAsync(cancellationToken);
 
+        await _db.Spans
+            .Where(s => s.ReceivedAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+
         await _db.Sessions
             .Where(s => s.LastUpdate < cutoff)
             .ExecuteDeleteAsync(cancellationToken);

@@ -10,6 +10,7 @@ using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
 using IntelligenceKit.Server.Ingest;
+using IntelligenceKit.Server.Performance;
 using IntelligenceKit.Server.Projects;
 using IntelligenceKit.Server.Releases;
 using IntelligenceKit.Server.Retention;
@@ -175,6 +176,13 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
             p.ProjectId == intelligenceEvent.ProjectId && p.ProjectKey == projectKey);
         if (!known)
             return Results.NotFound(new { error = "Unknown project. Register it via POST /admin/projects." });
+    }
+
+    // SDK performance batches are stored as spans, not issues.
+    if (intelligenceEvent.EventType == EventType.Performance && intelligenceEvent.Spans is { Count: > 0 })
+    {
+        await PerformanceEndpoints.IngestAsync(db, intelligenceEvent);
+        return Results.Accepted();
     }
 
     // Session updates feed release health, not issues.
@@ -606,6 +614,7 @@ app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext
 
 app.MapSessionEndpoints();
 app.MapReleaseEndpoints();
+app.MapPerformanceEndpoints();
 app.MapAlertEndpoints(AdminOnly);
 app.MapSymbolEndpoints(AdminOnly);
 

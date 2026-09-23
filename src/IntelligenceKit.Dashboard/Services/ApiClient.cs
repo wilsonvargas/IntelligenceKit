@@ -129,6 +129,20 @@ public class ApiClient(HttpClient http)
                ?? Array.Empty<ReleaseHealth>();
     }
 
+    public async Task<IReadOnlyList<PerformanceSummary>> GetPerformanceAsync(
+        string? projectId = null, string? operation = null, string? release = null, int days = 7, CancellationToken ct = default)
+    {
+        var url = $"/performance?days={days}";
+        if (!string.IsNullOrWhiteSpace(projectId))
+            url += $"&projectId={Uri.EscapeDataString(projectId)}";
+        if (!string.IsNullOrWhiteSpace(operation))
+            url += $"&operation={Uri.EscapeDataString(operation)}";
+        if (!string.IsNullOrWhiteSpace(release))
+            url += $"&release={Uri.EscapeDataString(release)}";
+        return await http.GetFromJsonAsync<IReadOnlyList<PerformanceSummary>>(url, JsonOptions, ct)
+               ?? Array.Empty<PerformanceSummary>();
+    }
+
     // Alerts (admin-only) ---------------------------------------------------
 
     public async Task<IReadOnlyList<AlertRuleInfo>> GetAlertRulesAsync(CancellationToken ct = default)

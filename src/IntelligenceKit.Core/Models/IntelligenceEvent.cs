@@ -59,4 +59,7 @@ public class IntelligenceEvent
 
     /// <summary>Session state. Only set on <see cref="EventType.Session"/> events.</summary>
     public SessionInfo? Session { get; set; }
+
+    /// <summary>Batched timings. Only set on <see cref="EventType.Performance"/> events sent by the SDK.</summary>
+    public List<PerformanceSpan>? Spans { get; set; }
 }

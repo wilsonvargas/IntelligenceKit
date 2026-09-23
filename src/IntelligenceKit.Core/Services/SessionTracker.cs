@@ -197,23 +197,15 @@ public sealed class SessionTracker : ISessionTracker
         var live = _foregroundSince is { } since ? Math.Max(0, (Now - since).TotalSeconds) : 0;
         session.DurationSeconds = Math.Round(_accumulatedSeconds + live, 3);
 
-        return new IntelligenceEvent
+        var update = new IntelligenceEvent
         {
             EventType = EventType.Session,
             Session = session.Clone(),
-            ProjectId = _options.ProjectId,
-            ApplicationName = _options.ApplicationName,
-            ApplicationVersion = _options.ApplicationVersion,
-            Environment = _options.Environment,
-            Release = string.IsNullOrWhiteSpace(_options.Release) ? _options.ApplicationVersion : _options.Release,
-            Platform = Safe(() => _device.Platform),
-            DeviceName = Safe(() => _device.DeviceName),
-            DeviceModel = Safe(() => _device.Model),
-            Manufacturer = Safe(() => _device.Manufacturer),
-            OperatingSystem = Safe(() => _device.OperatingSystem),
             UserId = _userId,
             Timestamp = Now
         };
+        EventContext.Stamp(update, _options, _device);
+        return update;
     }
 
     private async Task SendAsync(IntelligenceEvent update, bool flush)
@@ -235,18 +227,6 @@ public sealed class SessionTracker : ISessionTracker
         try
         {
             return _installation.GetInstallationId();
-        }
-        catch
-        {
-            return string.Empty;
-        }
-    }
-
-    private static string Safe(Func<string> read)
-    {
-        try
-        {
-            return read();
         }
         catch
         {
