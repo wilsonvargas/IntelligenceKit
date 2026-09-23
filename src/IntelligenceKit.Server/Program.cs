@@ -113,6 +113,7 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<EventIngestor>();
 builder.Services.AddScoped<SessionIngestor>();
 builder.Services.AddScoped<IssueBackfill>();
+builder.Services.AddScoped<IntelligenceKit.Server.Demo.DemoSeeder>();
 builder.Services.AddSingleton<SymbolCache>();
 builder.Services.AddScoped<Symbolicator>();
 
@@ -192,6 +193,25 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 app.UseCors(DashboardCors);
+
+// Public demo instances: Demo:ReadOnly rejects every write (ingest, triage, admin)
+// while reads and the live SignalR feed keep working.
+if (app.Configuration.GetValue("Demo:ReadOnly", false))
+{
+    app.Use(async (context, next) =>
+    {
+        var method = context.Request.Method;
+        if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) ||
+            context.Request.Path.StartsWithSegments("/hubs"))
+        {
+            await next(context);
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { error = "This is a read-only demo instance." });
+    });
+}
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -201,6 +221,11 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IntelligenceDbContext>();
     db.Database.Migrate();
+
+    // Demo:Seed fills an EMPTY database with two weeks of sample data (a
+    // "demo-shop" project with releases, issues, sessions, spans and feedback).
+    if (app.Configuration.GetValue("Demo:Seed", false))
+        await scope.ServiceProvider.GetRequiredService<IntelligenceKit.Server.Demo.DemoSeeder>().SeedIfEmptyAsync();
 }
 
 if (app.Environment.IsDevelopment())
