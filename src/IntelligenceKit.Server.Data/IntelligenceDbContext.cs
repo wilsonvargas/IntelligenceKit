@@ -19,6 +19,8 @@ public class IntelligenceDbContext : DbContext
 
     public DbSet<AppSession> Sessions => Set<AppSession>();
 
+    public DbSet<SymbolFile> Symbols => Set<SymbolFile>();
+
     public DbSet<AlertRule> AlertRules => Set<AlertRule>();
 
     public DbSet<AlertNotification> AlertNotifications => Set<AlertNotification>();
@@ -60,6 +62,12 @@ public class IntelligenceDbContext : DbContext
         // Release-health reads: a project's sessions in a time window, per release.
         session.HasIndex(s => new { s.ProjectId, s.Started });
         session.HasIndex(s => new { s.ProjectId, s.Release });
+
+        var symbol = modelBuilder.Entity<SymbolFile>();
+        symbol.HasKey(s => s.Id);
+        symbol.Property(s => s.Kind).HasMaxLength(32);
+        symbol.Property(s => s.Key).HasMaxLength(300);
+        symbol.HasIndex(s => new { s.Kind, s.Key });
 
         var rule = modelBuilder.Entity<AlertRule>();
         rule.HasKey(r => r.Id);

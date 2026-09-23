@@ -118,7 +118,8 @@ public record EventDetail(
     Dictionary<string, JsonElement>? Data,
     bool HasScreenshot,
     DateTime Timestamp,
-    DateTime ReceivedAt);
+    DateTime ReceivedAt,
+    bool Symbolicated = false);
 
 /// <summary>An alert rule as returned by the API. <c>HasSecret</c> hides the signing key itself.</summary>
 public record AlertRuleInfo(
@@ -205,3 +206,9 @@ public record ReleaseHealth(
     int Events,
     int Exceptions,
     int NewIssues);
+
+/// <summary>An uploaded symbol file (content omitted).</summary>
+public record SymbolFileInfo(Guid Id, string Kind, string Key, string FileName, long Size, DateTime UploadedAt);
+
+/// <summary>Outcome for one file of a symbol upload; <c>Error</c> set when it was skipped.</summary>
+public record SymbolUploadResult(string FileName, string? Kind, string? Key, string? Error);

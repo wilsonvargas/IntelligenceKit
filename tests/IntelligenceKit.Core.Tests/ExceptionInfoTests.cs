@@ -71,4 +71,34 @@ public class ExceptionInfoTests
             Assert.False(string.IsNullOrEmpty(info.StackTrace));
         }
     }
+
+    [Fact]
+    public void FromException_CapturesSymbolicationFrames()
+    {
+        Exception thrown;
+        try
+        {
+            ThrowHelper();
+            return;
+        }
+        catch (Exception ex)
+        {
+            thrown = ex;
+        }
+
+        var info = ExceptionInfo.FromException(thrown);
+
+        Assert.NotNull(info.Frames);
+        var top = info.Frames![0];
+        Assert.Contains(nameof(ThrowHelper), top.Method);
+        Assert.Equal(typeof(ExceptionInfoTests).Module.ModuleVersionId, top.ModuleVersionId);
+        Assert.NotNull(top.MetadataToken);
+        Assert.NotNull(top.ILOffset);
+    }
+
+    [Fact]
+    public void FromException_NeverThrown_HasNoFrames()
+        => Assert.Null(ExceptionInfo.FromException(new Exception("not thrown")).Frames);
+
+    private static void ThrowHelper() => throw new InvalidOperationException("from helper");
 }

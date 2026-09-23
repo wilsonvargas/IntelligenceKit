@@ -135,7 +135,13 @@ else
 
     @if (_event.Exception is not null)
     {
-        <h2 class="h5 mb-2">Exception</h2>
+        <h2 class="h5 mb-2">
+            Exception
+            @if (_event.Symbolicated)
+            {
+                <span class="badge text-bg-info fs-6 align-middle" title="File/line or Java names recovered from uploaded debug symbols">symbolicated</span>
+            }
+        </h2>
         var level = 0;
         var ex = _event.Exception;
         while (ex is not null)

@@ -14,6 +14,7 @@ using IntelligenceKit.Server.Projects;
 using IntelligenceKit.Server.Releases;
 using IntelligenceKit.Server.Retention;
 using IntelligenceKit.Server.Sessions;
+using IntelligenceKit.Server.Symbols;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
@@ -69,6 +70,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<EventIngestor>();
 builder.Services.AddScoped<SessionIngestor>();
+builder.Services.AddSingleton<SymbolCache>();
+builder.Services.AddScoped<Symbolicator>();
 
 // Alerts: rules are evaluated at ingest (AlertEvaluator) and delivered off the
 // request path by a background dispatcher, so slow webhooks never delay ingest.
@@ -221,7 +224,9 @@ app.MapGet("/events", async (IntelligenceDbContext db, ClaimsPrincipal user, str
     return Results.Ok(new PagedResult<EventSummary>(total, skip, take, items));
 }).RequireAuthorization();
 
-app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db, ClaimsPrincipal user) =>
+// Exceptions are symbolicated on read (PDB file:line, R8 retrace) when matching
+// symbols were uploaded — see Symbols/. The stored event itself is untouched.
+app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db, ClaimsPrincipal user, Symbolicator symbolicator) =>
 {
     var e = await db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
     if (e is null)
@@ -235,6 +240,10 @@ app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db, Claims
 
     var hasScreenshot = await db.Screenshots.AsNoTracking().AnyAsync(s => s.EventId == id);
 
+    var (exception, symbolicated) = await symbolicator.SymbolicateAsync(
+        e.ExceptionJson is null ? null : JsonSerializer.Deserialize<ExceptionInfo>(e.ExceptionJson),
+        e.ProjectId, e.Release);
+
     var detail = new EventDetail(
         e.Id, e.ProjectId, e.ProjectKey,
         e.ApplicationName, e.ApplicationVersion,
@@ -242,7 +251,7 @@ app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db, Claims
         e.Platform, e.DeviceName, e.DeviceModel, e.Manufacturer, e.OperatingSystem,
         e.UserId,
         e.EventType, e.Level, e.Message,
-        e.ExceptionJson is null ? null : JsonSerializer.Deserialize<ExceptionInfo>(e.ExceptionJson),
+        exception,
         e.DeviceRuntimeJson is null ? null : JsonSerializer.Deserialize<DeviceRuntime>(e.DeviceRuntimeJson),
         e.BreadcrumbsJson is null
             ? Array.Empty<Breadcrumb>()
@@ -250,7 +259,8 @@ app.MapGet("/events/{id:guid}", async (Guid id, IntelligenceDbContext db, Claims
         e.TagsJson is null ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(e.TagsJson),
         e.DataJson is null ? null : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(e.DataJson),
         hasScreenshot,
-        e.Timestamp, e.ReceivedAt);
+        e.Timestamp, e.ReceivedAt,
+        symbolicated);
 
     return Results.Ok(detail);
 }).RequireAuthorization();
@@ -597,6 +607,7 @@ app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext
 app.MapSessionEndpoints();
 app.MapReleaseEndpoints();
 app.MapAlertEndpoints(AdminOnly);
+app.MapSymbolEndpoints(AdminOnly);
 
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 
