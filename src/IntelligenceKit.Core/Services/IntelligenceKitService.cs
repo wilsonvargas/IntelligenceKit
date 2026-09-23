@@ -3,6 +3,7 @@ using IntelligenceKit.Core.Configuration;
 using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Enums;
 using IntelligenceKit.Core.Models;
+using IntelligenceKit.Core.Privacy;
 using IntelligenceKit.Core.Providers;
 using IntelligenceKit.Core.Storage;
 
@@ -19,6 +20,7 @@ public class IntelligenceKitService : IIntelligenceKit
     private readonly ILastScreenProvider _lastScreen;
     private readonly IScreenshotStore _screenshots;
     private readonly ISessionTracker? _sessions;
+    private readonly PiiScrubber? _scrubber;
 
     // Mutable per-session scope. This service is a singleton, so these carry
     // across events until changed.
@@ -55,6 +57,7 @@ public class IntelligenceKitService : IIntelligenceKit
         ISessionTracker? sessions)
     {
         _sessions = sessions;
+        _scrubber = options.EnablePiiScrubbing ? new PiiScrubber(options) : null;
         _store = store;
         _uploader = uploader;
         _options = options;
@@ -67,11 +70,17 @@ public class IntelligenceKitService : IIntelligenceKit
 
     public async Task TrackAsync(IntelligenceEvent intelligenceEvent)
     {
+        if (!Sampled())
+            return;
+
         Enrich(intelligenceEvent);
+        var processed = Process(intelligenceEvent);
+        if (processed is null)
+            return; // dropped by BeforeSend
 
         // Store-and-forward: persist first (durable even if the app dies now),
         // then opportunistically drain the queue to the server.
-        await _store.SaveAsync(intelligenceEvent);
+        await _store.SaveAsync(processed);
         await _uploader.FlushAsync();
     }
 
@@ -85,8 +94,18 @@ public class IntelligenceKitService : IIntelligenceKit
         _sessions?.RecordError();
 
         var exceptionEvent = BuildExceptionEvent(exception);
-        await AttachScreenshotAsync(exceptionEvent);
-        await TrackAsync(exceptionEvent);
+        if (!Sampled())
+            return;
+
+        Enrich(exceptionEvent);
+        var processed = Process(exceptionEvent);
+        if (processed is null)
+            return;
+
+        // Only attach the screenshot for events that will actually be sent.
+        await AttachScreenshotAsync(processed);
+        await _store.SaveAsync(processed);
+        await _uploader.FlushAsync();
     }
 
     public Task TrackLogAsync(SeverityLevel level, string message, IDictionary<string, string>? data = null)
@@ -144,6 +163,15 @@ public class IntelligenceKitService : IIntelligenceKit
         var intelligenceEvent = BuildExceptionEvent(exception);
         Enrich(intelligenceEvent);
 
+        // Crashes are never sampled out, but BeforeSend/scrubbing still apply.
+        var processed = Process(intelligenceEvent);
+        if (processed is null)
+        {
+            await CloseCrashedSessionAsync();
+            return;
+        }
+        intelligenceEvent = processed;
+
         // Persist only — no flush. The process is dying; the uploader picks this
         // up on the next launch. Both writes are fast local writes; the screenshot
         // bytes were already captured proactively (never on this dying thread).
@@ -152,17 +180,64 @@ public class IntelligenceKitService : IIntelligenceKit
 
         // Close the session as crashed (also persist-only), after the crash itself
         // is safely stored.
-        if (_sessions is not null)
+        await CloseCrashedSessionAsync();
+    }
+
+    private async Task CloseCrashedSessionAsync()
+    {
+        if (_sessions is null)
+            return;
+
+        try
+        {
+            await _sessions.CaptureCrashAsync();
+        }
+        catch
+        {
+            // Release health is best-effort; the crash event is what matters.
+        }
+    }
+
+    /// <summary>Keeps a non-fatal event with probability <see cref="IntelligenceOptions.SampleRate"/>.</summary>
+    private bool Sampled()
+    {
+        var rate = _options.SampleRate;
+        return rate >= 1.0 || (rate > 0.0 && Random.Shared.NextDouble() < rate);
+    }
+
+    /// <summary>
+    /// Runs the user's BeforeSend hook, then PII scrubbing. Returns null when the
+    /// hook dropped the event. A throwing hook is ignored (event sent as-is).
+    /// </summary>
+    private IntelligenceEvent? Process(IntelligenceEvent intelligenceEvent)
+    {
+        if (_options.BeforeSend is { } beforeSend)
         {
             try
             {
-                await _sessions.CaptureCrashAsync();
+                var result = beforeSend(intelligenceEvent);
+                if (result is null)
+                    return null;
+                intelligenceEvent = result;
             }
             catch
             {
-                // Release health is best-effort; the crash event is what matters.
+                // Never let a buggy hook lose the event.
             }
         }
+
+        if (_scrubber is not null)
+        {
+            try
+            {
+                _scrubber.Scrub(intelligenceEvent);
+            }
+            catch
+            {
+            }
+        }
+
+        return intelligenceEvent;
     }
 
     /// <summary>

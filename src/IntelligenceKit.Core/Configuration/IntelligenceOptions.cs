@@ -1,3 +1,6 @@
+using System.Text.RegularExpressions;
+using IntelligenceKit.Core.Models;
+
 namespace IntelligenceKit.Core.Configuration;
 
 public class IntelligenceOptions
@@ -73,4 +76,33 @@ public class IntelligenceOptions
 
     /// <summary>How long the UI thread may be unresponsive before it counts as an ANR (default 5 s, like Android).</summary>
     public TimeSpan AnrThreshold { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Last chance to modify or drop an event before it is stored and sent. Runs
+    /// after enrichment and before PII scrubbing. Return null to drop the event. If
+    /// the callback throws, the event is sent unmodified. Also runs for crashes
+    /// (keep it fast and side-effect free).
+    /// </summary>
+    public Func<IntelligenceEvent, IntelligenceEvent?>? BeforeSend { get; set; }
+
+    /// <summary>Modify or drop (return null) a breadcrumb before it enters the trail.</summary>
+    public Func<Breadcrumb, Breadcrumb?>? BeforeBreadcrumb { get; set; }
+
+    /// <summary>
+    /// Fraction (0.0–1.0) of non-fatal events (handled exceptions, logs, ANRs) to
+    /// keep. Fatal crashes and session updates are never sampled out.
+    /// </summary>
+    public double SampleRate { get; set; } = 1.0;
+
+    /// <summary>
+    /// Mask personal data and secrets (emails, tokens, card numbers, sensitive keys)
+    /// before events leave the device. On by default.
+    /// </summary>
+    public bool EnablePiiScrubbing { get; set; } = true;
+
+    /// <summary>Extra key fragments whose values are always replaced by "[Filtered]".</summary>
+    public List<string> ScrubbingSensitiveKeys { get; set; } = new();
+
+    /// <summary>Extra patterns masked in free text (messages, breadcrumbs, string values).</summary>
+    public List<Regex> ScrubbingPatterns { get; set; } = new();
 }

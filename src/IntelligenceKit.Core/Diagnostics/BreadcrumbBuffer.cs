@@ -12,14 +12,31 @@ public class BreadcrumbBuffer : IBreadcrumbBuffer
     private readonly int _capacity;
     private readonly LinkedList<Breadcrumb> _items = new();
     private readonly object _lock = new();
+    private readonly Func<Breadcrumb, Breadcrumb?>? _beforeBreadcrumb;
 
     public BreadcrumbBuffer(IntelligenceOptions options)
     {
         _capacity = Math.Max(1, options.BreadcrumbCapacity);
+        _beforeBreadcrumb = options.BeforeBreadcrumb;
     }
 
     public void Add(Breadcrumb breadcrumb)
     {
+        if (_beforeBreadcrumb is not null)
+        {
+            try
+            {
+                var kept = _beforeBreadcrumb(breadcrumb);
+                if (kept is null)
+                    return;
+                breadcrumb = kept;
+            }
+            catch
+            {
+                // A faulty hook must not lose the breadcrumb or break the caller.
+            }
+        }
+
         lock (_lock)
         {
             _items.AddLast(breadcrumb);
