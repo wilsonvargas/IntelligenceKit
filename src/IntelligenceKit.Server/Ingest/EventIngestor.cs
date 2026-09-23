@@ -1,7 +1,7 @@
 using System.Text.Json;
 using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Models;
-using IntelligenceKit.Server.Contracts;
+using IntelligenceKit.Server.Alerts;
 using IntelligenceKit.Server.Data;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -33,11 +33,15 @@ public sealed class EventIngestor
 {
     private readonly IntelligenceDbContext _db;
     private readonly IHubContext<EventsHub> _hub;
+    private readonly AlertEvaluator _alerts;
+    private readonly ILogger<EventIngestor> _logger;
 
-    public EventIngestor(IntelligenceDbContext db, IHubContext<EventsHub> hub)
+    public EventIngestor(IntelligenceDbContext db, IHubContext<EventsHub> hub, AlertEvaluator alerts, ILogger<EventIngestor> logger)
     {
         _db = db;
         _hub = hub;
+        _alerts = alerts;
+        _logger = logger;
     }
 
     public async Task<IngestResult> IngestAsync(IntelligenceEvent intelligenceEvent, string projectKey, CancellationToken ct = default)
@@ -66,6 +70,17 @@ public sealed class EventIngestor
         // Push the updated issue (trend is recomputed on read).
         await _hub.Clients.Groups("admins", $"project:{issue.ProjectId}")
             .SendAsync("issueUpserted", issue.ToSummary(), ct);
+
+        // Alerting is best-effort: the event is already stored, so a rule problem
+        // must never turn a successful ingest into an error.
+        try
+        {
+            await _alerts.EvaluateAsync(stored, issue, change, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Alert evaluation failed for event {EventId}.", stored.Id);
+        }
 
         return new IngestResult(false, stored, issue, change);
     }

@@ -58,6 +58,11 @@ public sealed class RetentionSweeper
             .Where(i => i.LastSeen < cutoff)
             .ExecuteDeleteAsync(cancellationToken);
 
+        // Alert history ages out with the data it refers to (not counted in the result).
+        await _db.AlertNotifications
+            .Where(n => n.CreatedAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+
         return new RetentionResult(true, cutoff, events, screenshots, issues);
     }
 }

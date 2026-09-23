@@ -17,6 +17,10 @@ public class IntelligenceDbContext : DbContext
 
     public DbSet<Project> Projects => Set<Project>();
 
+    public DbSet<AlertRule> AlertRules => Set<AlertRule>();
+
+    public DbSet<AlertNotification> AlertNotifications => Set<AlertNotification>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var stored = modelBuilder.Entity<StoredEvent>();
@@ -46,5 +50,15 @@ public class IntelligenceDbContext : DbContext
         project.HasIndex(p => p.ReadKeyHash);
         // Ingest validates the (ProjectId, ProjectKey) pair.
         project.HasIndex(p => new { p.ProjectId, p.ProjectKey });
+
+        var rule = modelBuilder.Entity<AlertRule>();
+        rule.HasKey(r => r.Id);
+        rule.HasIndex(r => r.ProjectId);
+
+        var notification = modelBuilder.Entity<AlertNotification>();
+        notification.HasKey(n => n.Id);
+        // Cooldown lookup (rule, issue, newest) and the history feed (newest first).
+        notification.HasIndex(n => new { n.RuleId, n.IssueId, n.CreatedAt });
+        notification.HasIndex(n => new { n.ProjectId, n.CreatedAt });
     }
 }

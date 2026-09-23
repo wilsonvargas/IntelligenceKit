@@ -117,3 +117,51 @@ public record EventDetail(
     bool HasScreenshot,
     DateTime Timestamp,
     DateTime ReceivedAt);
+
+/// <summary>An alert rule as returned by the API. <c>HasSecret</c> hides the signing key itself.</summary>
+public record AlertRuleInfo(
+    Guid Id,
+    string? ProjectId,
+    string Name,
+    string Trigger,
+    int ThresholdCount,
+    int ThresholdWindowMinutes,
+    string Channel,
+    string Target,
+    bool HasSecret,
+    bool Enabled,
+    int CooldownMinutes,
+    DateTime CreatedAt);
+
+/// <summary>
+/// Create/replace an alert rule. <c>Trigger</c>: NewIssue | Regression | Threshold
+/// (Threshold also needs <c>ThresholdCount</c> and <c>ThresholdWindowMinutes</c>).
+/// <c>Channel</c>: Webhook | Slack | Teams | Discord | Email; <c>Target</c> is the
+/// webhook URL or comma-separated email recipients. <c>ProjectId</c> null = all projects.
+/// </summary>
+public record UpsertAlertRuleRequest(
+    string Name,
+    string Trigger,
+    string Channel,
+    string Target,
+    string? ProjectId = null,
+    int ThresholdCount = 0,
+    int ThresholdWindowMinutes = 0,
+    string? Secret = null,
+    bool Enabled = true,
+    int CooldownMinutes = 60);
+
+/// <summary>One entry in the alert delivery history. <c>Success</c> null = still pending.</summary>
+public record AlertNotificationInfo(
+    Guid Id,
+    Guid RuleId,
+    string RuleName,
+    string ProjectId,
+    Guid? IssueId,
+    string? IssueTitle,
+    string Trigger,
+    string Channel,
+    DateTime CreatedAt,
+    bool? Success,
+    string? Error,
+    DateTime? DeliveredAt);

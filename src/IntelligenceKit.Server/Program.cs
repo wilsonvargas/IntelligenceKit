@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using IntelligenceKit.Core.Models;
 using IntelligenceKit.Server;
+using IntelligenceKit.Server.Alerts;
 using IntelligenceKit.Server.Auth;
 using IntelligenceKit.Server.Contracts;
 using IntelligenceKit.Server.Data;
@@ -64,6 +65,14 @@ builder.Services.AddDbContext<IntelligenceDbContext>(options =>
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<EventIngestor>();
+
+// Alerts: rules are evaluated at ingest (AlertEvaluator) and delivered off the
+// request path by a background dispatcher, so slow webhooks never delay ingest.
+builder.Services.AddHttpClient(AlertSender.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddSingleton<AlertQueue>();
+builder.Services.AddSingleton<AlertSender>();
+builder.Services.AddScoped<AlertEvaluator>();
+builder.Services.AddHostedService<AlertDispatcher>();
 
 // Data retention: a background service prunes events/screenshots/issues older
 // than Retention:Days on a Retention:SweepHours cadence. Off by default (opt in
@@ -566,6 +575,8 @@ app.MapDelete("/admin/projects/{id:guid}", async (Guid id, IntelligenceDbContext
     await db.SaveChangesAsync();
     return Results.NoContent();
 }).RequireAuthorization(AdminOnly);
+
+app.MapAlertEndpoints(AdminOnly);
 
 app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
 

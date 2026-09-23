@@ -100,4 +100,47 @@ public class ApiClient(HttpClient http)
         => await http.GetFromJsonAsync<PagedResult<EventSummary>>(
                $"/issues/{id}/events?skip={skip}&take={take}", JsonOptions, ct)
            ?? new PagedResult<EventSummary>(0, skip, take, Array.Empty<EventSummary>());
+
+    // Alerts (admin-only) ---------------------------------------------------
+
+    public async Task<IReadOnlyList<AlertRuleInfo>> GetAlertRulesAsync(CancellationToken ct = default)
+        => await http.GetFromJsonAsync<IReadOnlyList<AlertRuleInfo>>("/alerts/rules", JsonOptions, ct)
+           ?? Array.Empty<AlertRuleInfo>();
+
+    /// <summary>Creates (id null) or replaces a rule. Returns the server's error text on 400.</summary>
+    public async Task<(AlertRuleInfo? Rule, string? Error)> SaveAlertRuleAsync(
+        Guid? id, UpsertAlertRuleRequest request, CancellationToken ct = default)
+    {
+        var response = id is null
+            ? await http.PostAsJsonAsync("/alerts/rules", request, JsonOptions, ct)
+            : await http.PutAsJsonAsync($"/alerts/rules/{id}", request, JsonOptions, ct);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            return (null, (await response.Content.ReadAsStringAsync(ct)).Trim('"'));
+
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<AlertRuleInfo>(JsonOptions, ct), null);
+    }
+
+    public async Task DeleteAlertRuleAsync(Guid id, CancellationToken ct = default)
+        => (await http.DeleteAsync($"/alerts/rules/{id}", ct)).EnsureSuccessStatusCode();
+
+    /// <summary>Fires a synthetic alert through the rule. Returns null on success, else the error.</summary>
+    public async Task<string?> TestAlertRuleAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await http.PostAsync($"/alerts/rules/{id}/test", null, ct);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, ct);
+        return result.GetProperty("success").GetBoolean() ? null : result.GetProperty("error").GetString();
+    }
+
+    public async Task<PagedResult<AlertNotificationInfo>> GetAlertHistoryAsync(
+        string? projectId = null, int skip = 0, int take = 50, CancellationToken ct = default)
+    {
+        var url = $"/alerts/history?skip={skip}&take={take}";
+        if (!string.IsNullOrWhiteSpace(projectId))
+            url += $"&projectId={Uri.EscapeDataString(projectId)}";
+        return await http.GetFromJsonAsync<PagedResult<AlertNotificationInfo>>(url, JsonOptions, ct)
+               ?? new PagedResult<AlertNotificationInfo>(0, skip, take, Array.Empty<AlertNotificationInfo>());
+    }
 }

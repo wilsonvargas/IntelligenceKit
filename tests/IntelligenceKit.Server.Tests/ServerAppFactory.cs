@@ -26,6 +26,7 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
     private readonly bool _withToken;
     private readonly IReadOnlyDictionary<string, string?>? _extraSettings;
     private readonly bool _disableHostedServices;
+    private readonly Action<IServiceCollection>? _configureServices;
 
     // xUnit's IClassFixture requires exactly one public constructor; it yields the
     // default configuration (Development + a configured read token). Other
@@ -38,12 +39,14 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
         string environment,
         bool withToken,
         IReadOnlyDictionary<string, string?>? extraSettings = null,
-        bool disableHostedServices = false)
+        bool disableHostedServices = false,
+        Action<IServiceCollection>? configureServices = null)
     {
         _environment = environment;
         _withToken = withToken;
         _extraSettings = extraSettings;
         _disableHostedServices = disableHostedServices;
+        _configureServices = configureServices;
         _connection.Open();
     }
 
@@ -96,6 +99,13 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
             ["Ingest:RequireKnownProject"] = "true",
         });
 
+    /// <summary>A factory with extra settings and/or service overrides (e.g. a fake
+    /// outbound HTTP handler), applied after the app's own registrations.</summary>
+    public static ServerAppFactory CreateWith(
+        Action<IServiceCollection>? configureServices = null,
+        IReadOnlyDictionary<string, string?>? settings = null)
+        => new("Development", withToken: true, settings, configureServices: configureServices);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(_environment);
@@ -139,6 +149,8 @@ public sealed class ServerAppFactory : WebApplicationFactory<Program>
             // drive their logic directly without a timer racing them.
             if (_disableHostedServices)
                 RemoveAll(services, typeof(IHostedService));
+
+            _configureServices?.Invoke(services);
         });
     }
 
