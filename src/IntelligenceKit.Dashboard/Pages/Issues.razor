@@ -33,6 +33,11 @@
 
 <div class="row g-2 align-items-end mb-3">
     <div class="col-12 col-md-4">
+        <label class="form-label small text-muted mb-1">Search</label>
+        <input class="form-control form-control-sm" placeholder="title or culprit…"
+               @bind="_q" @bind:event="oninput" @onkeydown="OnSearchKey" />
+    </div>
+    <div class="col-12 col-md-3">
         <label class="form-label small text-muted mb-1">Project</label>
         <input class="form-control form-control-sm" placeholder="all projects"
                @bind="_projectId" @bind:event="oninput" />
@@ -136,6 +141,10 @@ else
     /// <summary>Only issues first seen in this release (linked from the Releases page).</summary>
     [SupplyParameterFromQuery] public string? Release { get; set; }
 
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+
+    private string? _q;
+
     private static readonly (string Label, string Value)[] StatusTabs =
     [
         ("Unresolved", "Unresolved"), ("Resolved", "Resolved"), ("Ignored", "Ignored"), ("All", "all")
@@ -171,6 +180,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _projectId = ProjectId;
+        _q = Q;
         _status = string.IsNullOrWhiteSpace(Status) ? "Unresolved" : Status;
         _skip = 0;
         await LoadAsync();
@@ -182,6 +192,10 @@ else
         if (_skip != 0 || _page is null)
             return;
         if (!string.IsNullOrWhiteSpace(Release) && issue.FirstRelease != Release)
+            return;
+        if (!string.IsNullOrWhiteSpace(_q) &&
+            !issue.Title.Contains(_q, StringComparison.OrdinalIgnoreCase) &&
+            !(issue.Culprit?.Contains(_q, StringComparison.OrdinalIgnoreCase) ?? false))
             return;
         if (!string.IsNullOrWhiteSpace(_projectId) &&
             !string.Equals(issue.ProjectId, _projectId, StringComparison.OrdinalIgnoreCase))
@@ -228,7 +242,7 @@ else
         _page = null;
         try
         {
-            _page = await Api.GetIssuesAsync(_projectId, _skip, PageSize, IsAll ? null : _status, Release);
+            _page = await Api.GetIssuesAsync(_projectId, _skip, PageSize, IsAll ? null : _status, Release, _q);
         }
         catch (Exception ex)
         {
@@ -248,12 +262,24 @@ else
             url += $"&projectId={Uri.EscapeDataString(_projectId)}";
         if (withRelease && !string.IsNullOrWhiteSpace(Release))
             url += $"&release={Uri.EscapeDataString(Release)}";
+        if (!string.IsNullOrWhiteSpace(_q))
+            url += $"&q={Uri.EscapeDataString(_q)}";
         return url;
+    }
+
+    private void OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            ApplyFilters();
     }
 
     private void ApplyFilters() => Nav.NavigateTo(TabUrl(_status));
 
-    private void ClearFilters() => Nav.NavigateTo($"/issues?status={Uri.EscapeDataString(_status)}");
+    private void ClearFilters()
+    {
+        _q = null;
+        Nav.NavigateTo($"/issues?status={Uri.EscapeDataString(_status)}");
+    }
 
     private async Task Prev()
     {

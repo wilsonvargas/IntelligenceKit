@@ -13,28 +13,88 @@
     </span>
 </div>
 
-<div class="row g-2 align-items-end mb-3">
-    <div class="col-12 col-md-4">
-        <label class="form-label small text-muted mb-1">Project</label>
-        <input class="form-control form-control-sm" placeholder="all projects"
-               @bind="_projectId" @bind:event="oninput" />
+<div class="row g-2 align-items-end mb-2">
+    <div class="col-12 col-md-5">
+        <label class="form-label small text-muted mb-1">Search</label>
+        <input class="form-control form-control-sm" placeholder="message, exception type or text…"
+               @bind="_f.Q" @bind:event="oninput" @onkeydown="OnSearchKey" />
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md-2">
+        <label class="form-label small text-muted mb-1">Project</label>
+        <input class="form-control form-control-sm" placeholder="all" @bind="_f.ProjectId" />
+    </div>
+    <div class="col-6 col-md-2">
         <label class="form-label small text-muted mb-1">Event type</label>
-        <select class="form-select form-select-sm" @bind="_eventType">
+        <select class="form-select form-select-sm" @bind="_f.EventType">
             <option value="">all</option>
             <option value="Exception">Exception</option>
             <option value="Log">Log</option>
             <option value="Unknown">Unknown</option>
         </select>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-4 col-md-1">
         <button class="btn btn-primary btn-sm w-100" @onclick="ApplyFilters">Apply</button>
     </div>
-    <div class="col-6 col-md-2">
+    <div class="col-4 col-md-1">
         <button class="btn btn-outline-secondary btn-sm w-100" @onclick="ClearFilters">Clear</button>
     </div>
+    <div class="col-4 col-md-1">
+        <button class="btn btn-link btn-sm w-100 px-0" @onclick="() => _more = !_more">@(_more ? "Less" : "More")</button>
+    </div>
 </div>
+
+@if (_more)
+{
+    <div class="row g-2 align-items-end mb-3">
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-1">Level</label>
+            <select class="form-select form-select-sm" @bind="_f.Level">
+                <option value="">any</option>
+                <option>Critical</option>
+                <option>Error</option>
+                <option>Warning</option>
+                <option>Information</option>
+                <option>Debug</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-1">Release</label>
+            <input class="form-control form-control-sm" @bind="_f.Release" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-1">Environment</label>
+            <input class="form-control form-control-sm" @bind="_f.Environment" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-1">Platform</label>
+            <input class="form-control form-control-sm" placeholder="Android, iOS…" @bind="_f.Platform" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-1">User id</label>
+            <input class="form-control form-control-sm" @bind="_f.UserId" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-1">OS contains</label>
+            <input class="form-control form-control-sm" placeholder="Android 14" @bind="_f.OperatingSystem" />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1">Device model contains</label>
+            <input class="form-control form-control-sm" @bind="_f.DeviceModel" />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1">Tag (key:value)</label>
+            <input class="form-control form-control-sm" placeholder="tenant:acme" @bind="_tag" />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1">From</label>
+            <input type="datetime-local" class="form-control form-control-sm" @bind="_f.From" />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1">To</label>
+            <input type="datetime-local" class="form-control form-control-sm" @bind="_f.To" />
+        </div>
+    </div>
+}
 
 @if (_error is not null)
 {
@@ -110,11 +170,23 @@ else
 @code {
     [SupplyParameterFromQuery] public string? ProjectId { get; set; }
     [SupplyParameterFromQuery] public string? EventType { get; set; }
+    [SupplyParameterFromQuery] public string? Q { get; set; }
+    [SupplyParameterFromQuery] public string? Level { get; set; }
+    [SupplyParameterFromQuery] public string? Release { get; set; }
+    [SupplyParameterFromQuery] public string? Environment { get; set; }
+    [SupplyParameterFromQuery] public string? Platform { get; set; }
+    [SupplyParameterFromQuery] public string? UserId { get; set; }
+    [SupplyParameterFromQuery] public string? OperatingSystem { get; set; }
+    [SupplyParameterFromQuery] public string? DeviceModel { get; set; }
+    [SupplyParameterFromQuery] public string? Tag { get; set; }
+    [SupplyParameterFromQuery] public DateTime? From { get; set; }
+    [SupplyParameterFromQuery] public DateTime? To { get; set; }
 
     private const int PageSize = 50;
 
-    private string? _projectId;
-    private string? _eventType;
+    private EventFilter _f = new();
+    private string? _tag;
+    private bool _more;
     private int _skip;
     private PagedResult<EventSummary>? _page;
     private string? _error;
@@ -142,8 +214,18 @@ else
     protected override async Task OnParametersSetAsync()
     {
         // React to query-string changes (e.g. arriving from the projects page).
-        _projectId = ProjectId;
-        _eventType = EventType;
+        _f = new EventFilter
+        {
+            ProjectId = ProjectId, EventType = EventType, Q = Q, Level = Level, Release = Release,
+            Environment = Environment, Platform = Platform, UserId = UserId,
+            OperatingSystem = OperatingSystem, DeviceModel = DeviceModel,
+            Tag = string.IsNullOrWhiteSpace(Tag) ? null : [Tag],
+            From = From?.ToLocalTime(), To = To?.ToLocalTime()
+        };
+        _tag = Tag;
+        _more |= Level is not null || Release is not null || Environment is not null || Platform is not null ||
+                 UserId is not null || OperatingSystem is not null || DeviceModel is not null || Tag is not null ||
+                 From is not null || To is not null;
         _skip = 0;
         await LoadAsync();
     }
@@ -154,9 +236,12 @@ else
         // and only while on the first page (so paging stays stable).
         if (_skip != 0 || _page is null)
             return;
-        if (!string.IsNullOrWhiteSpace(_projectId) && !string.Equals(e.ProjectId, _projectId, StringComparison.OrdinalIgnoreCase))
+        // The live payload is a summary; with detail filters active, wait for a refresh.
+        if (HasDetailFilters)
             return;
-        if (!string.IsNullOrWhiteSpace(_eventType) && !string.Equals(e.EventType, _eventType, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(_f.ProjectId) && !string.Equals(e.ProjectId, _f.ProjectId, StringComparison.OrdinalIgnoreCase))
+            return;
+        if (!string.IsNullOrWhiteSpace(_f.EventType) && !string.Equals(e.EventType, _f.EventType, StringComparison.OrdinalIgnoreCase))
             return;
         if (_page.Items.Any(i => i.Id == e.Id))
             return;
@@ -180,7 +265,7 @@ else
         _page = null;
         try
         {
-            _page = await Api.GetEventsAsync(_projectId, _eventType, _skip, PageSize);
+            _page = await Api.GetEventsAsync(_f, _skip, PageSize);
         }
         catch (Exception ex)
         {
@@ -188,16 +273,24 @@ else
         }
     }
 
+    private bool HasDetailFilters =>
+        !string.IsNullOrWhiteSpace(_f.Q) || _f.Level is { Length: > 0 } || _f.Release is { Length: > 0 } ||
+        _f.Environment is { Length: > 0 } || _f.Platform is { Length: > 0 } || _f.UserId is { Length: > 0 } ||
+        _f.OperatingSystem is { Length: > 0 } || _f.DeviceModel is { Length: > 0 } || _f.Tag is { Length: > 0 } ||
+        _f.From is not null || _f.To is not null;
+
     private void ApplyFilters()
     {
         // Push filters into the URL so the view is shareable/bookmarkable.
-        var query = new List<string>();
-        if (!string.IsNullOrWhiteSpace(_projectId))
-            query.Add($"projectId={Uri.EscapeDataString(_projectId)}");
-        if (!string.IsNullOrWhiteSpace(_eventType))
-            query.Add($"eventType={Uri.EscapeDataString(_eventType)}");
+        _f.Tag = string.IsNullOrWhiteSpace(_tag) ? null : [_tag.Trim()];
+        var query = _f.ToQueryString();
+        Nav.NavigateTo(query.Length == 0 ? "/events" : $"/events?{query}");
+    }
 
-        Nav.NavigateTo(query.Count == 0 ? "/events" : $"/events?{string.Join('&', query)}");
+    private void OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            ApplyFilters();
     }
 
     private void ClearFilters() => Nav.NavigateTo("/events");

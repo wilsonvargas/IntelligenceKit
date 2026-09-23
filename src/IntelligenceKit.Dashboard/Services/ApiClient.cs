@@ -26,19 +26,13 @@ public class ApiClient(HttpClient http)
            ?? Array.Empty<ProjectSummary>();
 
     public async Task<PagedResult<EventSummary>> GetEventsAsync(
-        string? projectId = null,
-        string? eventType = null,
-        int skip = 0,
-        int take = 50,
-        CancellationToken ct = default)
+        EventFilter filter, int skip = 0, int take = 50, CancellationToken ct = default)
     {
-        var query = new List<string> { $"skip={skip}", $"take={take}" };
-        if (!string.IsNullOrWhiteSpace(projectId))
-            query.Add($"projectId={Uri.EscapeDataString(projectId)}");
-        if (!string.IsNullOrWhiteSpace(eventType))
-            query.Add($"eventType={Uri.EscapeDataString(eventType)}");
+        var url = $"/events?skip={skip}&take={take}";
+        var query = filter.ToQueryString();
+        if (query.Length > 0)
+            url += "&" + query;
 
-        var url = $"/events?{string.Join('&', query)}";
         return await http.GetFromJsonAsync<PagedResult<EventSummary>>(url, JsonOptions, ct)
                ?? new PagedResult<EventSummary>(0, skip, take, Array.Empty<EventSummary>());
     }
@@ -66,9 +60,11 @@ public class ApiClient(HttpClient http)
 
     public async Task<PagedResult<IssueSummary>> GetIssuesAsync(
         string? projectId = null, int skip = 0, int take = 50, string? status = null,
-        string? release = null, CancellationToken ct = default)
+        string? release = null, string? q = null, CancellationToken ct = default)
     {
         var url = $"/issues?skip={skip}&take={take}";
+        if (!string.IsNullOrWhiteSpace(q))
+            url += $"&q={Uri.EscapeDataString(q)}";
         if (!string.IsNullOrWhiteSpace(projectId))
             url += $"&projectId={Uri.EscapeDataString(projectId)}";
         if (!string.IsNullOrWhiteSpace(status))

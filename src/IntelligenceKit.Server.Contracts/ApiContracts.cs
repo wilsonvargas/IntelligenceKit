@@ -235,3 +235,53 @@ public record FeedbackInfo(
     string? Email,
     string? UserId,
     DateTime CreatedAt);
+
+/// <summary>
+/// Search filters for <c>GET /events</c> (and exports). Every field is optional and
+/// they combine with AND. <c>Q</c> matches message, exception message and exception
+/// type; <c>Tag</c> takes <c>key:value</c> and may repeat. Bound from the query
+/// string on the server and rendered back to it by <see cref="ToQueryString"/>.
+/// </summary>
+public sealed class EventFilter
+{
+    public string? ProjectId { get; set; }
+    public string? EventType { get; set; }
+    public string? Q { get; set; }
+    public string? Level { get; set; }
+    public string? Release { get; set; }
+    public string? Environment { get; set; }
+    public string? Platform { get; set; }
+    public string? UserId { get; set; }
+    public string? OperatingSystem { get; set; }
+    public string? DeviceModel { get; set; }
+    public string[]? Tag { get; set; }
+    public DateTime? From { get; set; }
+    public DateTime? To { get; set; }
+
+    /// <summary>"a=1&amp;b=2" (no leading '?'); empty when no filter is set.</summary>
+    public string ToQueryString()
+    {
+        var parts = new List<string>();
+        void Add(string name, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                parts.Add($"{name}={Uri.EscapeDataString(value)}");
+        }
+
+        Add("projectId", ProjectId);
+        Add("eventType", EventType);
+        Add("q", Q);
+        Add("level", Level);
+        Add("release", Release);
+        Add("environment", Environment);
+        Add("platform", Platform);
+        Add("userId", UserId);
+        Add("operatingSystem", OperatingSystem);
+        Add("deviceModel", DeviceModel);
+        foreach (var tag in Tag ?? [])
+            Add("tag", tag);
+        Add("from", From?.ToUniversalTime().ToString("O"));
+        Add("to", To?.ToUniversalTime().ToString("O"));
+        return string.Join('&', parts);
+    }
+}

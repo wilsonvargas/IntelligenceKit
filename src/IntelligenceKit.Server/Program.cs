@@ -15,6 +15,7 @@ using IntelligenceKit.Server.Performance;
 using IntelligenceKit.Server.Projects;
 using IntelligenceKit.Server.Releases;
 using IntelligenceKit.Server.Retention;
+using IntelligenceKit.Server.Search;
 using IntelligenceKit.Server.Sessions;
 using IntelligenceKit.Server.Symbols;
 using Microsoft.AspNetCore.Authentication;
@@ -214,19 +215,14 @@ app.MapPost("/events", async (IntelligenceEvent intelligenceEvent, HttpRequest r
 }).RequireRateLimiting(IngestRateLimit);
 
 // Query ------------------------------------------------------------------
-app.MapGet("/events", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, string? eventType, int skip = 0, int take = 50) =>
+// Search: every EventFilter field is an optional query parameter (q, level,
+// release, environment, platform, userId, operatingSystem, deviceModel,
+// tag=key:value (repeatable), from, to, projectId, eventType).
+app.MapGet("/events", async (IntelligenceDbContext db, ClaimsPrincipal user, [AsParameters] EventFilter filter, int skip = 0, int take = 50) =>
 {
     take = Math.Clamp(take, 1, 200);
 
-    var query = db.Events.AsNoTracking().AsQueryable();
-
-    // A scoped caller is pinned to its own project; the query param can't widen it.
-    var projectFilter = user.ProjectScope() ?? projectId;
-    if (!string.IsNullOrWhiteSpace(projectFilter))
-        query = query.Where(e => e.ProjectId == projectFilter);
-
-    if (!string.IsNullOrWhiteSpace(eventType))
-        query = query.Where(e => e.EventType == eventType);
+    var query = EventSearch.Apply(db.Events.AsNoTracking(), filter, user.ProjectScope());
 
     var total = await query.CountAsync();
 
@@ -408,7 +404,9 @@ app.MapGet("/stats/events-per-hour", async (IntelligenceDbContext db, ClaimsPrin
 // Grouped problems: one row per (project, fingerprint), newest activity first.
 // ?status=Unresolved|Resolved|Ignored narrows the list; omitted = every status.
 // ?release=X keeps only issues first seen in release X ("introduced in").
-app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, string? status, string? release, int skip = 0, int take = 50) =>
+// ?q= searches title/culprit; ?assignedTo=, ?level=, ?eventType= narrow further.
+app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, string? projectId, string? status, string? release,
+    string? q, string? assignedTo, string? level, string? eventType, int skip = 0, int take = 50) =>
 {
     take = Math.Clamp(take, 1, 200);
 
@@ -428,6 +426,14 @@ app.MapGet("/issues", async (IntelligenceDbContext db, ClaimsPrincipal user, str
 
     if (!string.IsNullOrWhiteSpace(release))
         query = query.Where(i => i.FirstRelease == release);
+    if (!string.IsNullOrWhiteSpace(q))
+        query = query.Where(i => i.Title.Contains(q) || (i.Culprit != null && i.Culprit.Contains(q)));
+    if (!string.IsNullOrWhiteSpace(assignedTo))
+        query = query.Where(i => i.AssignedTo == assignedTo);
+    if (!string.IsNullOrWhiteSpace(level))
+        query = query.Where(i => i.Level == level);
+    if (!string.IsNullOrWhiteSpace(eventType))
+        query = query.Where(i => i.EventType == eventType);
 
     var total = await query.CountAsync();
 
