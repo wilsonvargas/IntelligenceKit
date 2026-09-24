@@ -12,13 +12,15 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
 </p>
 
-IntelligenceKit captures crashes, logs and rich runtime context from your app, ships them to a backend you control, and shows them on a real-time dashboard. Add one line to your MAUI app and it starts working — no per-capture-site code.
+IntelligenceKit captures crashes, ANRs, logs, sessions and performance from your app, ships them to a backend you control, and shows them on a real-time dashboard with issue triage, release health and alerts. It works with **MAUI** (Android, iOS, Mac Catalyst, Windows), **ASP.NET Core**, **Blazor WebAssembly**, **WPF**, **WinForms**, **Avalonia** and plain console/worker apps. One line of setup, and no code at each capture site.
+
+📖 **[Documentation](https://wilsonvargas.github.io/IntelligenceKit/)** · 🧪 [Try the demo](#try-the-demo) · 🚀 [Deploy](deploy/README.md)
 
 ![IntelligenceKit dashboard — live Overview](docs/images/overview.jpg)
 
 <p align="center"><em>The real-time Overview — KPI tiles, errors-per-hour, exception share and top issues. Dark theme by default, with a light toggle.</em></p>
 
-> **Status: stable (`1.0.0`).** The public SDK API is frozen under [Semantic Versioning](#versioning-and-api-stability); the read side is authenticated (admin token or per-project read key) and the stack is self-hostable via Docker. See the [CHANGELOG](CHANGELOG.md) for what shipped. Feedback and contributions welcome.
+> **Status: stable (`1.1.0`).** The public SDK API follows [Semantic Versioning](#versioning-and-api-stability). The read side is authenticated (admin token or per-project read key), and the stack is self-hostable with Docker or one-click cloud templates. See the [CHANGELOG](CHANGELOG.md) for what shipped. Feedback and contributions are welcome.
 
 ---
 
@@ -29,22 +31,32 @@ The .NET/MAUI ecosystem lacks a lightweight, self-hostable crash + observability
 - **MAUI-native** — proper crash capture on Android and iOS, device context, last-screen capture.
 - **Self-hosted** — your data, your server, your database.
 - **One-line integration** — `builder.UseIntelligenceKit(dsn)` and you're done.
-- **Clean & extensible** — the core is framework-agnostic; MAUI is just the first client.
+- **All of .NET** — the core is framework-agnostic, with SDKs for MAUI, ASP.NET Core, Blazor, WPF, WinForms, Avalonia and generic hosts.
 
 ## Features
 
-**Client SDK (MAUI)**
-- **Crash reporting** on Android & iOS with a typed, nested `ExceptionInfo` (inner-exception chain preserved).
-- **Offline store-and-forward** — events persist to a local SQLite queue first, then upload; nothing is lost if the app crashes or is offline. The queue drains on next launch and when connectivity returns.
-- **Rich context** — breadcrumbs ("what led here"), a device runtime snapshot (memory, battery, network, current screen), plus `Environment`, `Release`, `User` (anonymous, opt-in), `Tags` and severity levels.
-- **Last-screen capture** (opt-in) — a downscaled JPEG of the screen before the crash, captured proactively and stored apart from the event payload. Privacy-first: off by default, per-page exclusion list, no full-res images.
-- **Logs** — `TrackLogAsync(level, message, data)` doubles as a breadcrumb.
+**Capture**
+- **Crashes** on Android (managed and Java), iOS, Mac Catalyst, Windows and desktop, written to a local queue and sent on the next launch. Handled exceptions and `ILogger` errors are captured too.
+- **ANR detection**: a frozen UI thread is reported as `ApplicationNotResponding`.
+- **Sessions**: crash-free sessions and crash-free users, per release.
+- **Performance**: app start, page load, HTTP client and ASP.NET Core request timings (p50, p75, p95).
+- **Context**: breadcrumbs, device state at the time of the crash, environment, release, user, tags, opt-in last-screen capture, and user feedback (including a "what were you doing?" prompt after a crash).
+- **Offline store-and-forward**: nothing is lost when the app crashes or is offline.
+- **Privacy**: PII scrubbing on by default, `BeforeSend` / `BeforeBreadcrumb` hooks, and sampling.
 
-**Backend & dashboard**
-- **Persistent backend** on EF Core with **SQLite (default), PostgreSQL, or SQL Server** — selectable by config.
-- **Issue grouping** — repeated crashes collapse into one issue by fingerprint (exception type + top frame), with occurrence counts, first/last seen and a rising/falling trend.
-- **Real-time dashboard** (Blazor WebAssembly) — new events *and* issue updates stream in live over SignalR, no refresh.
-- **Errors-per-hour chart** and per-project overview.
+**Triage**
+- **Issues** grouped by exception type and top in-app frame (or a custom fingerprint), with resolve / ignore / assign and **regression detection** ("resolved in 2.4.1" and seen again).
+- **Release health**: adoption, crash-free rates and new issues per release.
+- **Readable release stack traces**: upload PDBs and R8 mappings (an MSBuild target does it after a Release build) to get file and line numbers and deobfuscated Java frames.
+- **Issue insights**: distributions by platform, OS, device, release and tags; affected users; per-user timelines.
+- **Search and filters**, CSV/JSON export, and one-click **GitHub / Jira** issues.
+- **Alerts** for new issues, regressions and spikes, via webhook (HMAC-signed), Slack, Teams, Discord or email.
+
+**Run it**
+- **Your database**: SQLite (default), PostgreSQL or SQL Server.
+- **Real-time dashboard** (Blazor WebAssembly) over SignalR, with a project management page, dark and light themes.
+- **Deploy anywhere**: Docker images on GHCR, Docker Compose, and templates for Render, Azure App Service and Railway.
+- **Operable**: `/health/live` and `/health/ready`, Prometheus `/metrics`, OTLP export, retention, rate limiting and a read-only demo mode.
 
 ## Screenshots
 
@@ -66,7 +78,9 @@ The .NET/MAUI ecosystem lacks a lightweight, self-hostable crash + observability
 Dependency direction (nothing depends on MAUI except the MAUI SDK):
 
 ```
-Sample.Maui ─► IntelligenceKit.Maui ─► IntelligenceKit.Core
+Sample.Maui ─► IntelligenceKit.Maui ─────────────┐
+IntelligenceKit.AspNetCore / Blazor / Wpf /      ├─► Extensions.Logging ─► IntelligenceKit.Core
+  WinForms / Avalonia ─► IntelligenceKit.Hosting ┘
 IntelligenceKit.Server    ─► Core, Server.Contracts, Server.Data, Server.Migrations.*
 IntelligenceKit.Dashboard ─► Server.Contracts
 ```
@@ -76,14 +90,27 @@ Every event flows through a single funnel (`IntelligenceKitService.Enrich()` →
 ## Repository layout
 
 ```
-src/        Product code (the library + backend + dashboard)
-samples/    Sample.Maui — a demo app that consumes the SDK
-tests/      Core.Tests (unit) + Server.Tests (integration, WebApplicationFactory)
+src/        Product code: the SDK packages, the backend and the dashboard
+samples/    Sample.Maui, a demo app that uses the SDK
+tests/      Core.Tests (unit), Sdk.Tests (hosting/ASP.NET Core SDKs) and
+            Server.Tests (integration, WebApplicationFactory)
+docs/       The documentation site (GitHub Pages)
+deploy/     Render, Azure and Railway templates
 ```
 
 Everything targets **.NET 10**. The solution is `IntelligenceKit.slnx` (the XML solution format).
 
 ## Quick start
+
+### Try the demo
+
+Two weeks of sample data (releases, a regression, ANRs, slow endpoints, user feedback) in a read-only instance:
+
+```bash
+IK_READ_TOKEN=demo docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+```
+
+Open **http://localhost:8080** and sign in with `demo`.
 
 ### Run the whole stack with Docker (recommended)
 
@@ -91,7 +118,7 @@ The fastest path — PostgreSQL + server + dashboard in a single command:
 
 ```bash
 cp .env.example .env      # then set IK_READ_TOKEN to a long random value
-docker compose up --build
+docker compose up -d       # prebuilt images from GHCR; add --build to build from source
 ```
 
 Dashboard on **http://localhost:8080**, API on **http://localhost:7099**. The server runs against PostgreSQL and applies its schema automatically. See [docker/README.md](docker/README.md) for configuration (ports, credentials, pointing the dashboard at a remote API).
@@ -154,6 +181,18 @@ That one call registers crash capture, the offline queue, the uploader, context/
 > **Android emulator:** it can't reach your host via `localhost`. Use the special alias **`10.0.2.2`** to point at the server running on your machine:
 > `UseIntelligenceKit("http://demo-key@10.0.2.2:7099/my-project")`.
 
+**Other app types** use the same DSN:
+
+```csharp
+builder.UseIntelligenceKit(dsn);                     // ASP.NET Core, or Blazor WebAssembly
+IntelligenceKitWpf.Init(dsn);                        // WPF (App constructor)
+IntelligenceKitWinForms.Init(dsn);                   // WinForms (Main)
+AppBuilder.Configure<App>().UseIntelligenceKit(dsn); // Avalonia
+services.AddIntelligenceKit(dsn);                    // console apps, workers, services
+```
+
+See [SDKs](https://wilsonvargas.github.io/IntelligenceKit/sdks) for the details of each one.
+
 **Use it in code** (`IIntelligenceKit` is injected via DI):
 
 ```csharp
@@ -202,7 +241,7 @@ Because EF migrations are provider-specific, each provider has its own migration
 ```bash
 dotnet ef migrations add <Name> \
   --project src/IntelligenceKit.Server.Migrations.Sqlite \
-  --startup-project src/IntelligenceKit.Server
+  --startup-project src/IntelligenceKit.Server.Migrations.Sqlite
 ```
 
 A schema change means regenerating the migration in all three provider projects.
@@ -261,24 +300,21 @@ A project read key is presented the same way (`Authorization: Bearer <read-key>`
 
 ## Roadmap
 
-Done: crash reporting (Android/iOS) · offline store-and-forward · background uploader · rich context (breadcrumbs, device snapshot, tags/user/env) · last-screen capture · persistent multi-provider backend · real-time SignalR dashboard · errors-per-hour chart · read-side auth · **issue grouping** · ingest rate limiting · data retention · **per-project scoping (multi-tenant)**.
+Shipped in `1.1.0`: issue lifecycle and regressions · alerts · sessions and crash-free rates · release health · ANR detection · symbolication · `BeforeSend`, sampling and PII scrubbing · performance monitoring · better grouping and backfill · `ILogger` provider · ASP.NET Core, Blazor, WPF, WinForms, Avalonia and generic-host SDKs · MAUI on Windows and Mac Catalyst · user feedback · search and filters · issue distributions · affected users · project management UI · export and GitHub/Jira issues · health checks and metrics · GHCR images and cloud templates · demo mode and documentation site.
 
-Shipped in `1.0.0`: NuGet packaging · CI · full test suite (Core + Server integration) · Docker Compose stack · ingest rate limiting · data retention · per-project scoping.
-
-After 1.0 (1.x):
-- [ ] Native iOS `NSException` handler (current capture is managed-exception only)
-- [ ] Issue backfill (grouping is forward-only today)
-- [ ] Project management UI in the dashboard (today it's the admin API)
-- [ ] Webhook alerts (Slack/Discord/Teams) — fire on new issue / frequency spike
+Next:
+- [ ] Native iOS `NSException` and signal handlers (capture is managed-exception only today)
+- [ ] Per-user accounts and roles for the dashboard
 - [ ] AI-assisted diagnosis over grouped issues (opt-in, provider-agnostic, PII-scrubbed)
 
 ## Versioning and API stability
 
 IntelligenceKit follows [Semantic Versioning](https://semver.org/). As of `1.0.0`
-the **public API of the `IntelligenceKit.Core` and `IntelligenceKit.Maui` NuGet
-packages** is stable: no breaking changes without a major (`2.0.0`) bump. That
-covers `UseIntelligenceKit`, `IIntelligenceKit`, `IntelligenceOptions`, the domain
-model and the public abstractions.
+the **public API of the IntelligenceKit SDK NuGet packages** (`Core`, `Maui`,
+`Hosting`, `Extensions.Logging`, `AspNetCore`, `Blazor`, `Wpf`, `WinForms`, `Avalonia`)
+is stable: no breaking changes without a major (`2.0.0`) bump. That
+covers `UseIntelligenceKit` and the other entry points, `IIntelligenceKit`,
+`IntelligenceOptions`, the domain model and the public abstractions.
 
 Not covered by the SemVer guarantee (may change in a minor release): the server's
 HTTP endpoints and database schema, the dashboard, and the DSN/wire format — though
