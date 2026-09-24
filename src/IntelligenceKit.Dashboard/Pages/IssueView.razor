@@ -49,7 +49,7 @@ else
             }
             else
             {
-                <span class="small text-muted align-self-center">
+                <span class="small text-muted align-self-end py-1">
                     Resolved @_issue.ResolvedAt?.ToLocalTime().ToString("g")
                     @if (!string.IsNullOrWhiteSpace(_issue.ResolvedInRelease))
                     {
@@ -67,19 +67,19 @@ else
             }
             @if (!string.IsNullOrEmpty(_issue.ExternalIssueUrl))
             {
-                <a class="btn btn-outline-dark btn-sm" href="@_issue.ExternalIssueUrl" target="_blank" rel="noopener">Open linked issue ↗</a>
+                <a class="btn btn-outline-secondary btn-sm" href="@_issue.ExternalIssueUrl" target="_blank" rel="noopener">Open linked issue ↗</a>
             }
             else
             {
                 @if (_integrations?.GitHub == true)
                 {
-                    <button class="btn btn-outline-dark btn-sm" disabled="@_saving" @onclick="@(() => ExternalAsync("github"))">
+                    <button class="btn btn-outline-secondary btn-sm" disabled="@_saving" @onclick="@(() => ExternalAsync("github"))">
                         @(_integrations.GitHubCreatesViaApi ? "Create GitHub issue" : "Draft GitHub issue")
                     </button>
                 }
                 @if (_integrations?.Jira == true)
                 {
-                    <button class="btn btn-outline-dark btn-sm" disabled="@_saving" @onclick="@(() => ExternalAsync("jira"))">Create Jira issue</button>
+                    <button class="btn btn-outline-secondary btn-sm" disabled="@_saving" @onclick="@(() => ExternalAsync("jira"))">Create Jira issue</button>
                 }
                 @if (_prefilledUrl is not null)
                 {

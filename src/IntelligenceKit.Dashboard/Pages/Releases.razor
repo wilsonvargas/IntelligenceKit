@@ -62,7 +62,7 @@ else
                 @foreach (var r in _releases)
                 {
                     var unhealthy = r.CrashFreeSessionRate is < 0.99;
-                    <tr class="@(unhealthy ? "table-danger" : "")">
+                    <tr class="@(unhealthy ? "ik-row-danger" : "")">
                         <td class="fw-semibold"><code>@r.Release</code></td>
                         <td>
                             @if (r.Adoption is { } adoption)

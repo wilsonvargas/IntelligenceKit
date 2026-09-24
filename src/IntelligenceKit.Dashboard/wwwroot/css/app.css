@@ -318,6 +318,8 @@ main { flex: 1; min-width: 0; }
 .table > tbody > tr { border-color: var(--ik-border); }
 .table > tbody > tr > td { border-color: var(--ik-border); vertical-align: middle; }
 table tbody tr[role="button"] { cursor: pointer; }
+/* Highlighted (unhealthy) row: a tint that reads in both themes, unlike .table-danger. */
+.table > tbody > tr.ik-row-danger { --bs-table-bg-type: rgba(242, 84, 91, 0.12); }
 
 /* --- Badges -------------------------------------------------------------- */
 .badge { font-weight: 600; letter-spacing: .01em; }
