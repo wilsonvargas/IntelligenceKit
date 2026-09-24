@@ -15,7 +15,7 @@ public static class SessionEndpoints
     public static void MapSessionEndpoints(this WebApplication app)
     {
         // Crash-free sessions/users over the last N days, plus a daily series.
-        // Aggregated in memory (bounded window, provider-neutral — see CLAUDE.md).
+        // Aggregated in memory (bounded window): the GroupBy shape and date functions differ across SQLite, PostgreSQL and SQL Server.
         app.MapGet("/stats/crash-free", async (IntelligenceDbContext db, ClaimsPrincipal user,
             string? projectId, string? environment, string? release, int days = 14) =>
         {
