@@ -29,7 +29,7 @@
 		<IsPackable>true</IsPackable>
 		<PackageId>IntelligenceKit.Maui</PackageId>
 		<Title>IntelligenceKit for .NET MAUI</Title>
-		<Description>One-line, self-hosted crash reporting and observability for .NET MAUI (Android, iOS, Mac Catalyst, Windows) — a Sentry/App Center/Crashlytics alternative for the .NET ecosystem. Typed crash capture, offline store-and-forward, breadcrumbs, device context and opt-in last-screen capture, all via builder.UseIntelligenceKit(dsn).</Description>
+		<Description>One-line, self-hosted crash reporting and observability for .NET MAUI (Android, iOS, Mac Catalyst, Windows) — a Sentry/App Center/Crashlytics alternative for the .NET ecosystem. Crash and ANR capture, sessions and crash-free rates, app start/page load/HTTP performance, offline store-and-forward, breadcrumbs, device context, PII scrubbing and opt-in last-screen capture, all via builder.UseIntelligenceKit(dsn).</Description>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<NoWarn>$(NoWarn);CS1591</NoWarn>

@@ -19,6 +19,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>observability;crash-reporting;logging;diagnostics;telemetry;maui;dotnet;sentry-alternative</PackageTags>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageReleaseNotes>https://github.com/wilsonvargas/IntelligenceKit/blob/master/CHANGELOG.md</PackageReleaseNotes>
 
     <!-- Not packable unless a project opts in. -->
     <IsPackable>false</IsPackable>

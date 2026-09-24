@@ -7,7 +7,7 @@ All notable changes to IntelligenceKit are documented here. The format is based 
 The public API of the `IntelligenceKit.Core` and `IntelligenceKit.Maui` NuGet packages
 is what SemVer applies to (see [Versioning](README.md#versioning-and-api-stability)).
 
-## [1.1.0] - Unreleased
+## [1.1.0] - 2026-09-24
 
 The SDK API is extended, not changed. Apps built against 1.0 compile and run unchanged.
 
@@ -130,5 +130,6 @@ First stable release. The API is now frozen under SemVer.
   store-and-forward, rich context, last-screen capture, multi-provider backend,
   real-time dashboard, read-side auth and issue grouping.
 
+[1.1.0]: https://github.com/wilsonvargas/IntelligenceKit/releases/tag/v1.1.0
 [1.0.0]: https://github.com/wilsonvargas/IntelligenceKit/releases/tag/v1.0.0
 [0.1.0-alpha.1]: https://github.com/wilsonvargas/IntelligenceKit/releases/tag/v0.1.0-alpha.1
