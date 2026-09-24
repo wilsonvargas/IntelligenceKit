@@ -1,0 +1,29 @@
+title: IntelligenceKit
+description: Self-hosted crash reporting, performance and release health for .NET and MAUI apps.
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+
+color_scheme: dark
+search_enabled: true
+heading_anchors: true
+logo: /images/icon.png
+
+aux_links:
+  GitHub: https://github.com/wilsonvargas/IntelligenceKit
+  NuGet: https://www.nuget.org/packages?q=IntelligenceKit
+aux_links_new_tab: true
+
+gh_edit_link: true
+gh_edit_link_text: Edit this page on GitHub
+gh_edit_repository: https://github.com/wilsonvargas/IntelligenceKit
+gh_edit_branch: master
+gh_edit_source: docs
+gh_edit_view_mode: tree
+
+relative_links:
+  enabled: true
+  collections: false
+
+footer_content: IntelligenceKit is MIT licensed.
