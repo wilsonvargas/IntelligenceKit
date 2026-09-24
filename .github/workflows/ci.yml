@@ -53,7 +53,7 @@ jobs:
           --logger "trx;LogFileName=server-test-results.trx"
           --results-directory ./TestResults
 
-      - name: Test (SDKs: hosting, ASP.NET Core)
+      - name: "Test (SDKs: hosting, ASP.NET Core)"
         run: >
           dotnet test tests/IntelligenceKit.Sdk.Tests/IntelligenceKit.Sdk.Tests.csproj
           --configuration Release
