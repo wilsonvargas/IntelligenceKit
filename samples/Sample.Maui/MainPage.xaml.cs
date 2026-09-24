@@ -96,6 +96,12 @@ namespace Sample.Maui
             await ShowQueueAsync("Log (warning) registrado.");
         }
 
+        private void OnFreezeClicked(object? sender, EventArgs e)
+        {
+            // Deliberately block the UI thread longer than the 5 s ANR threshold.
+            Thread.Sleep(TimeSpan.FromSeconds(7));
+        }
+
         private void OnCrashClicked(object? sender, EventArgs e)
         {
             // Unhandled on purpose: exercises the crash reporter. The event is

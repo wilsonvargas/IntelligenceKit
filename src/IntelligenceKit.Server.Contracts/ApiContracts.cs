@@ -30,7 +30,8 @@ public record TimeBucket(DateTime Start, int Total, int Exceptions);
 /// <summary>
 /// A grouped problem for the Issues view. <c>RecentCount</c>/<c>PreviousCount</c>
 /// are occurrences in the last hour vs the hour before, so the client can draw a
-/// trend arrow.
+/// trend arrow. <c>Status</c> is Unresolved | Resolved | Ignored; <c>IsRegression</c>
+/// flags a resolved issue that came back.
 /// </summary>
 public record IssueSummary(
     Guid Id,
@@ -45,7 +46,23 @@ public record IssueSummary(
     DateTime LastSeen,
     Guid LastEventId,
     int RecentCount,
-    int PreviousCount);
+    int PreviousCount,
+    string Status = "Unresolved",
+    bool IsRegression = false,
+    string? AssignedTo = null,
+    DateTime? ResolvedAt = null,
+    string? ResolvedInRelease = null,
+    DateTime? RegressedAt = null,
+    string? FirstRelease = null,
+    string? LastRelease = null,
+    string? ExternalIssueUrl = null);
+
+/// <summary>
+/// Triage update for an issue (PATCH /issues/{id}). Every field is optional; only
+/// the ones present are applied. <c>AssignedTo</c> = "" clears the assignee.
+/// <c>ResolvedInRelease</c> only applies together with <c>Status = Resolved</c>.
+/// </summary>
+public record UpdateIssueRequest(string? Status = null, string? AssignedTo = null, string? ResolvedInRelease = null);
 
 /// <summary>Per-project rollup for the projects overview.</summary>
 public record ProjectSummary(
@@ -102,4 +119,200 @@ public record EventDetail(
     Dictionary<string, JsonElement>? Data,
     bool HasScreenshot,
     DateTime Timestamp,
-    DateTime ReceivedAt);
+    DateTime ReceivedAt,
+    bool Symbolicated = false);
+
+/// <summary>An alert rule as returned by the API. <c>HasSecret</c> hides the signing key itself.</summary>
+public record AlertRuleInfo(
+    Guid Id,
+    string? ProjectId,
+    string Name,
+    string Trigger,
+    int ThresholdCount,
+    int ThresholdWindowMinutes,
+    string Channel,
+    string Target,
+    bool HasSecret,
+    bool Enabled,
+    int CooldownMinutes,
+    DateTime CreatedAt);
+
+/// <summary>
+/// Create/replace an alert rule. <c>Trigger</c>: NewIssue | Regression | Threshold
+/// (Threshold also needs <c>ThresholdCount</c> and <c>ThresholdWindowMinutes</c>).
+/// <c>Channel</c>: Webhook | Slack | Teams | Discord | Email; <c>Target</c> is the
+/// webhook URL or comma-separated email recipients. <c>ProjectId</c> null = all projects.
+/// </summary>
+public record UpsertAlertRuleRequest(
+    string Name,
+    string Trigger,
+    string Channel,
+    string Target,
+    string? ProjectId = null,
+    int ThresholdCount = 0,
+    int ThresholdWindowMinutes = 0,
+    string? Secret = null,
+    bool Enabled = true,
+    int CooldownMinutes = 60);
+
+/// <summary>One entry in the alert delivery history. <c>Success</c> null = still pending.</summary>
+public record AlertNotificationInfo(
+    Guid Id,
+    Guid RuleId,
+    string RuleName,
+    string ProjectId,
+    Guid? IssueId,
+    string? IssueTitle,
+    string Trigger,
+    string Channel,
+    DateTime CreatedAt,
+    bool? Success,
+    string? Error,
+    DateTime? DeliveredAt);
+
+/// <summary>
+/// Crash-free rates for a window. Rates are 0–1 and null when there were no
+/// sessions. <c>AbnormalSessions</c> are sessions that stopped reporting while in
+/// the foreground (e.g. killed by the OS or a native crash the SDK couldn't see).
+/// </summary>
+public record CrashFreeStats(
+    int Sessions,
+    int CrashedSessions,
+    int ErroredSessions,
+    int AbnormalSessions,
+    double? CrashFreeSessionRate,
+    int Users,
+    int CrashedUsers,
+    double? CrashFreeUserRate,
+    IReadOnlyList<CrashFreeDay> Daily);
+
+/// <summary>One UTC day of the crash-free series.</summary>
+public record CrashFreeDay(DateTime Date, int Sessions, int CrashedSessions, double? CrashFreeSessionRate);
+
+/// <summary>
+/// Health of one release over a window. <c>Adoption</c> is this release's share of
+/// all sessions in the last 24 hours (0–1, null without sessions). <c>NewIssues</c>
+/// counts issues first seen in this release.
+/// </summary>
+public record ReleaseHealth(
+    string Release,
+    DateTime FirstSeen,
+    DateTime LastSeen,
+    int Sessions,
+    int CrashedSessions,
+    double? CrashFreeSessionRate,
+    int Users,
+    double? CrashFreeUserRate,
+    double? Adoption,
+    int Events,
+    int Exceptions,
+    int NewIssues);
+
+/// <summary>An uploaded symbol file (content omitted).</summary>
+public record SymbolFileInfo(Guid Id, string Kind, string Key, string FileName, long Size, DateTime UploadedAt);
+
+/// <summary>Outcome for one file of a symbol upload; <c>Error</c> set when it was skipped.</summary>
+public record SymbolUploadResult(string FileName, string? Kind, string? Key, string? Error);
+
+/// <summary>Latency summary for one (operation, name) — e.g. one page or one endpoint.</summary>
+public record PerformanceSummary(
+    string Operation,
+    string Name,
+    int Count,
+    double AvgMs,
+    double P50Ms,
+    double P75Ms,
+    double P95Ms,
+    double FailureRate);
+
+/// <summary>User-written feedback about an event.</summary>
+public record FeedbackInfo(
+    Guid Id,
+    string ProjectId,
+    Guid EventId,
+    Guid? IssueId,
+    string Comments,
+    string? Name,
+    string? Email,
+    string? UserId,
+    DateTime CreatedAt);
+
+/// <summary>
+/// Search filters for <c>GET /events</c> (and exports). Every field is optional and
+/// they combine with AND. <c>Q</c> matches message, exception message and exception
+/// type; <c>Tag</c> takes <c>key:value</c> and may repeat. Bound from the query
+/// string on the server and rendered back to it by <see cref="ToQueryString"/>.
+/// </summary>
+public sealed class EventFilter
+{
+    public string? ProjectId { get; set; }
+    public string? EventType { get; set; }
+    public string? Q { get; set; }
+    public string? Level { get; set; }
+    public string? Release { get; set; }
+    public string? Environment { get; set; }
+    public string? Platform { get; set; }
+    public string? UserId { get; set; }
+    public string? OperatingSystem { get; set; }
+    public string? DeviceModel { get; set; }
+    public string[]? Tag { get; set; }
+    public DateTime? From { get; set; }
+    public DateTime? To { get; set; }
+
+    /// <summary>"a=1&amp;b=2" (no leading '?'); empty when no filter is set.</summary>
+    public string ToQueryString()
+    {
+        var parts = new List<string>();
+        void Add(string name, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                parts.Add($"{name}={Uri.EscapeDataString(value)}");
+        }
+
+        Add("projectId", ProjectId);
+        Add("eventType", EventType);
+        Add("q", Q);
+        Add("level", Level);
+        Add("release", Release);
+        Add("environment", Environment);
+        Add("platform", Platform);
+        Add("userId", UserId);
+        Add("operatingSystem", OperatingSystem);
+        Add("deviceModel", DeviceModel);
+        foreach (var tag in Tag ?? [])
+            Add("tag", tag);
+        Add("from", From?.ToUniversalTime().ToString("O"));
+        Add("to", To?.ToUniversalTime().ToString("O"));
+        return string.Join('&', parts);
+    }
+}
+
+/// <summary>How an issue's recent events spread across one dimension (platform, OS, a tag…).</summary>
+public record Distribution(string Key, int Total, IReadOnlyList<DistributionValue> Values);
+
+/// <summary>One value of a <see cref="Distribution"/>; <c>Share</c> is 0–1.</summary>
+public record DistributionValue(string Value, int Count, double Share);
+
+/// <summary>Distributions of an issue over its latest <c>SampledEvents</c> events.</summary>
+public record IssueDistributions(int SampledEvents, int AffectedUsers, IReadOnlyList<Distribution> Distributions);
+
+/// <summary>A user (opt-in <c>SetUser</c> id) affected by an issue.</summary>
+public record AffectedUser(string UserId, int Events, DateTime FirstSeen, DateTime LastSeen);
+
+/// <summary>Everything one user ran into: issues, sessions and their latest events.</summary>
+public record UserTimeline(
+    string UserId,
+    int TotalEvents,
+    int Sessions,
+    int CrashedSessions,
+    IReadOnlyList<IssueSummary> Issues,
+    IReadOnlyList<EventSummary> Events);
+
+/// <summary>Which issue trackers the server is configured for.</summary>
+public record IntegrationsInfo(bool GitHub, bool GitHubCreatesViaApi, bool Jira);
+
+/// <summary>
+/// Result of "create external issue". <c>Prefilled</c>: the URL opens a prefilled
+/// form the user submits (GitHub without a token); <c>Created</c>: it was created now.
+/// </summary>
+public record ExternalIssueResult(string Url, bool Created, bool Prefilled);

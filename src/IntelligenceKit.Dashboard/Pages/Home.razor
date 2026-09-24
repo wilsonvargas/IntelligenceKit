@@ -47,10 +47,20 @@
         </div>
     </div>
     <div class="col-6 col-lg-3">
-        <div class="stat-tile">
-            <div class="stat-label">Projects</div>
-            <div class="stat-value">@(_projects?.Count ?? 0)</div>
-            <div class="stat-delta">reporting in</div>
+        <div class="stat-tile" title="Share of sessions in the last 14 days that did not end in a crash">
+            <div class="stat-label">Crash-free sessions · 14d</div>
+            @if (_crashFree?.CrashFreeSessionRate is { } rate)
+            {
+                <div class="stat-value @(rate < 0.99 ? "danger" : "")">@Percent(rate)</div>
+                <div class="stat-delta">
+                    @_crashFree.Sessions sessions · @(_crashFree.CrashFreeUserRate is { } u ? Percent(u) : "–") of @_crashFree.Users users
+                </div>
+            }
+            else
+            {
+                <div class="stat-value">–</div>
+                <div class="stat-delta">no sessions yet · @(_projects?.Count ?? 0) projects</div>
+            }
         </div>
     </div>
 </div>
@@ -218,6 +228,7 @@ else if (_projects is not null)
     private IReadOnlyList<ProjectSummary>? _projects;
     private List<TimeBucket>? _stats;
     private IReadOnlyList<IssueSummary>? _topIssues;
+    private CrashFreeStats? _crashFree;
     private int _windowTotal;
     private int _windowExceptions;
     private int _issuesTotal;
@@ -253,9 +264,11 @@ else if (_projects is not null)
             _projects = await Api.GetProjectsAsync();
             _stats = (await Api.GetEventsPerHourAsync(hours: 24)).ToList();
 
-            var issues = await Api.GetIssuesAsync(take: 50);
+            var issues = await Api.GetIssuesAsync(take: 50, status: "Unresolved");
             _issuesTotal = issues.Total;
             _topIssues = issues.Items.OrderByDescending(i => i.EventCount).Take(5).ToList();
+
+            _crashFree = await Api.GetCrashFreeAsync(days: 14);
 
             RecomputeTotals();
         }
@@ -284,6 +297,8 @@ else if (_projects is not null)
         RecomputeTotals();
         InvokeAsync(StateHasChanged);
     }
+
+    private static string Percent(double rate) => (rate * 100).ToString(rate >= 0.999 ? "0.00" : "0.0") + "%";
 
     private void RecomputeTotals()
     {

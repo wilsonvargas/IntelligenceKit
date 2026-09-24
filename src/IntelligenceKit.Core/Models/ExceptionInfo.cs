@@ -19,6 +19,12 @@ public class ExceptionInfo
     public ExceptionInfo? InnerException { get; set; }
 
     /// <summary>
+    /// Structured managed frames (see <see cref="StackFrameInfo"/>), used by the
+    /// server to symbolicate release builds. Null for native/Java exceptions.
+    /// </summary>
+    public List<StackFrameInfo>? Frames { get; set; }
+
+    /// <summary>
     /// Builds an <see cref="ExceptionInfo"/> from a managed <see cref="Exception"/>,
     /// preserving the inner-exception chain.
     /// </summary>
@@ -30,6 +36,7 @@ public class ExceptionInfo
             Message = exception.Message,
             StackTrace = exception.StackTrace ?? string.Empty,
             Source = exception.Source ?? string.Empty,
+            Frames = StackFrameInfo.Capture(exception),
             InnerException = exception.InnerException is null
                 ? null
                 : FromException(exception.InnerException)

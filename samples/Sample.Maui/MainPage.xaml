@@ -74,6 +74,13 @@
                 HorizontalOptions="Fill" />
 
             <Button
+                x:Name="FreezeBtn"
+                Text="Congelar la UI 7 s (ANR)"
+                SemanticProperties.Hint="Bloquea el hilo principal para probar la detección de ANR"
+                Clicked="OnFreezeClicked"
+                HorizontalOptions="Fill" />
+
+            <Button
                 x:Name="CrashBtn"
                 Text="Provocar crash no controlado"
                 SemanticProperties.Hint="Lanza una excepción no controlada"

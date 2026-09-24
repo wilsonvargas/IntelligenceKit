@@ -7,6 +7,77 @@ All notable changes to IntelligenceKit are documented here. The format is based 
 The public API of the `IntelligenceKit.Core` and `IntelligenceKit.Maui` NuGet packages
 is what SemVer applies to (see [Versioning](README.md#versioning-and-api-stability)).
 
+## [1.1.0] - Unreleased
+
+The SDK API is extended, not changed. Apps built against 1.0 compile and run unchanged.
+
+> **Upgrade the server first.** A 1.1 SDK also sends session, performance-span and
+> feedback events. A 1.0 server stores them as ordinary events, so they clutter the
+> Events and Issues pages and give no crash-free rates, spans or feedback. A 1.1 server routes
+> them properly. It migrates its database on startup.
+
+### Added
+
+- **Issue lifecycle**: resolve (optionally *in a release*), ignore, reopen and assign
+  issues (`PATCH /issues/{id}`). A resolved issue that gets a new event is reopened
+  and flagged as a **regression**, unless the event comes from an older release than
+  the fix. Issues record the release that introduced them and the latest release seen.
+- **Alerts**: rules for new issues, regressions and event-count thresholds, sent to
+  a signed webhook, Slack, Teams, Discord or email (SMTP), with a per-issue cooldown,
+  delivery history and a test button.
+- **Sessions and crash-free rates**: automatic session tracking in every SDK;
+  crash-free sessions and users on the Overview (`GET /stats/crash-free`).
+- **Release health**: a Releases page with adoption, crash-free rates, session and
+  exception counts, and the new issues each release introduced (`GET /releases`).
+- **ANR detection**: a UI-thread watchdog in MAUI, WPF, WinForms and Avalonia reports
+  `ApplicationNotResponding` when the UI is frozen longer than `AnrThreshold`.
+- **Symbolication**: upload portable PDBs and Android R8/ProGuard mappings
+  (`POST /symbols`, or automatically after a Release build with
+  `IntelligenceKitUploadSymbols=true`). Release stack traces get file and line
+  numbers, and Java frames are deobfuscated.
+- **Privacy and volume controls**: `BeforeSend`, `BeforeBreadcrumb`, `SampleRate`,
+  and PII scrubbing, which is on by default (`EnablePiiScrubbing`,
+  `ScrubbingSensitiveKeys`, `ScrubbingPatterns`).
+- **Performance monitoring**: app start, page load, HTTP client
+  (`AddIntelligenceKitHandler()`) and ASP.NET Core request spans, plus
+  `IPerformanceMonitor.StartSpan` for your own. A Performance page shows p50, p75,
+  p95 and failure rate.
+- **Better grouping**: issues are grouped by the top *in-app* frame instead of
+  framework frames. Log events are grouped by message template. Custom fingerprints
+  are supported (`IntelligenceEvent.Fingerprint`, with `{{ default }}`), and
+  `POST /admin/issues/backfill` regroups stored events.
+- **New packages**: `IntelligenceKit.Extensions.Logging` (ILogger provider),
+  `IntelligenceKit.Hosting` (console apps, workers, services),
+  `IntelligenceKit.AspNetCore`, `IntelligenceKit.Blazor`, `IntelligenceKit.Wpf`,
+  `IntelligenceKit.WinForms` and `IntelligenceKit.Avalonia`.
+- **MAUI on Windows and Mac Catalyst**, alongside Android and iOS.
+- **User feedback**: `CaptureFeedbackAsync` and `LastEventId`, and an opt-in prompt
+  after a crash in MAUI (`EnableCrashFeedbackPrompt`). Feedback appears on events and
+  issues.
+- **Search and filters**: status tabs and text search on Issues; text, level,
+  environment, release, platform, OS, device, user, tag and date filters on Events.
+- **Issue insights**: distributions by platform, OS, device, manufacturer, release,
+  environment and tags; affected users; and a per-user timeline page.
+- **Projects page** in the dashboard: create projects, copy the DSN, rotate read
+  keys and delete projects.
+- **Export and issue trackers**: CSV/JSON export of events and issues; create a
+  GitHub issue (prefilled form or API) or a Jira issue from an issue.
+- **Server observability**: `/health/live` and `/health/ready` probes, Prometheus
+  `/metrics`, and optional OTLP export.
+- **Deployment**: server and dashboard images on GitHub Container Registry (amd64 and
+  arm64), `$PORT` support, and one-click templates for Render, Azure App Service and
+  Railway. The server also accepts `postgres://` URLs and `DATABASE_URL`.
+- **Demo mode**: `Demo:Seed` fills an empty database with sample data, and
+  `Demo:ReadOnly` rejects all writes (`docker-compose.demo.yml`).
+- **Documentation site** built from `docs/` and published to GitHub Pages.
+
+### Changed
+
+- `IIntelligenceKit` gained `CaptureFeedbackAsync` and `LastEventId` as default
+  interface members, so existing implementations still compile.
+- `HttpIntelligenceClient` moved to `IntelligenceKit.Core`, so every SDK can use it.
+  The MAUI type of the same name remains for compatibility.
+
 ## [1.0.0] - 2026-08-19
 
 First stable release. The API is now frozen under SemVer.

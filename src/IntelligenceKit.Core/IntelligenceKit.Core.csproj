@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- Opt-in build-time symbol upload, inherited by every IntelligenceKit SDK package. -->
+    <None Include="buildTransitive\IntelligenceKit.Core.targets" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>
 
 </Project>

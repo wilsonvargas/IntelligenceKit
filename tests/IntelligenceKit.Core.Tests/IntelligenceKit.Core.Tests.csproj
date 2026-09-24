@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IntelligenceKit.Core\IntelligenceKit.Core.csproj" />
+    <ProjectReference Include="..\..\src\IntelligenceKit.Extensions.Logging\IntelligenceKit.Extensions.Logging.csproj" />
   </ItemGroup>
 
 </Project>

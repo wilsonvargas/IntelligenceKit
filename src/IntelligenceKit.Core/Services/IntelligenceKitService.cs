@@ -3,6 +3,7 @@ using IntelligenceKit.Core.Configuration;
 using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Enums;
 using IntelligenceKit.Core.Models;
+using IntelligenceKit.Core.Privacy;
 using IntelligenceKit.Core.Providers;
 using IntelligenceKit.Core.Storage;
 
@@ -18,10 +19,13 @@ public class IntelligenceKitService : IIntelligenceKit
     private readonly IBreadcrumbBuffer _breadcrumbs;
     private readonly ILastScreenProvider _lastScreen;
     private readonly IScreenshotStore _screenshots;
+    private readonly ISessionTracker? _sessions;
+    private readonly PiiScrubber? _scrubber;
 
     // Mutable per-session scope. This service is a singleton, so these carry
     // across events until changed.
     private volatile string? _userId;
+    private Guid? _lastEventId;
     private readonly ConcurrentDictionary<string, string> _tags = new();
 
     public IntelligenceKitService(
@@ -33,7 +37,28 @@ public class IntelligenceKitService : IIntelligenceKit
         IBreadcrumbBuffer breadcrumbs,
         ILastScreenProvider lastScreen,
         IScreenshotStore screenshots)
+        : this(store, uploader, options, device, runtime, breadcrumbs, lastScreen, screenshots, sessions: null)
     {
+    }
+
+    /// <summary>
+    /// Full constructor. <paramref name="sessions"/> is optional: when supplied,
+    /// handled errors are counted against the current session and a fatal crash
+    /// marks it crashed (release health).
+    /// </summary>
+    public IntelligenceKitService(
+        IEventStore store,
+        IEventUploader uploader,
+        IntelligenceOptions options,
+        IDeviceContextProvider device,
+        IRuntimeContextProvider runtime,
+        IBreadcrumbBuffer breadcrumbs,
+        ILastScreenProvider lastScreen,
+        IScreenshotStore screenshots,
+        ISessionTracker? sessions)
+    {
+        _sessions = sessions;
+        _scrubber = options.EnablePiiScrubbing ? new PiiScrubber(options) : null;
         _store = store;
         _uploader = uploader;
         _options = options;
@@ -46,24 +71,61 @@ public class IntelligenceKitService : IIntelligenceKit
 
     public async Task TrackAsync(IntelligenceEvent intelligenceEvent)
     {
+        if (!Sampled())
+            return;
+
         Enrich(intelligenceEvent);
+        var processed = Process(intelligenceEvent);
+        if (processed is null)
+            return; // dropped by BeforeSend
 
         // Store-and-forward: persist first (durable even if the app dies now),
         // then opportunistically drain the queue to the server.
-        await _store.SaveAsync(intelligenceEvent);
+        await _store.SaveAsync(processed);
+        _lastEventId = processed.Id;
+        await _uploader.FlushAsync();
+    }
+
+    public Guid? LastEventId => _lastEventId;
+
+    public async Task CaptureFeedbackAsync(UserFeedback feedback)
+    {
+        if (feedback.EventId == Guid.Empty || string.IsNullOrWhiteSpace(feedback.Comments))
+            return;
+
+        // Written by the user on purpose: no sampling, hooks or scrubbing.
+        var e = new IntelligenceEvent { EventType = EventType.Feedback, Feedback = feedback };
+        EventContext.Stamp(e, _options, _device);
+        e.UserId = IntelligenceScope.Current?.UserId ?? _userId;
+
+        await _store.SaveAsync(e);
         await _uploader.FlushAsync();
     }
 
     public Task TrackExceptionAsync(Exception exception)
     {
+        ExceptionCapture.MarkCaptured(exception);
         return TrackExceptionAsync(ExceptionInfo.FromException(exception));
     }
 
     public async Task TrackExceptionAsync(ExceptionInfo exception)
     {
+        _sessions?.RecordError();
+
         var exceptionEvent = BuildExceptionEvent(exception);
-        await AttachScreenshotAsync(exceptionEvent);
-        await TrackAsync(exceptionEvent);
+        if (!Sampled())
+            return;
+
+        Enrich(exceptionEvent);
+        var processed = Process(exceptionEvent);
+        if (processed is null)
+            return;
+
+        // Only attach the screenshot for events that will actually be sent.
+        await AttachScreenshotAsync(processed);
+        await _store.SaveAsync(processed);
+        _lastEventId = processed.Id;
+        await _uploader.FlushAsync();
     }
 
     public Task TrackLogAsync(SeverityLevel level, string message, IDictionary<string, string>? data = null)
@@ -90,16 +152,41 @@ public class IntelligenceKitService : IIntelligenceKit
     public void AddBreadcrumb(string message, string category = BreadcrumbCategories.Custom,
         SeverityLevel level = SeverityLevel.Information, IDictionary<string, string>? data = null)
     {
-        _breadcrumbs.Add(new Breadcrumb
+        var breadcrumb = new Breadcrumb
         {
             Message = message,
             Category = category,
             Level = level,
             Data = data is null ? new() : new Dictionary<string, string>(data)
-        });
+        };
+
+        // Inside a scope (e.g. one request), the trail belongs to that scope.
+        if (IntelligenceScope.Current is { } scope)
+        {
+            if (_options.BeforeBreadcrumb is { } hook)
+            {
+                try
+                {
+                    breadcrumb = hook(breadcrumb);
+                }
+                catch
+                {
+                }
+                if (breadcrumb is null)
+                    return;
+            }
+            scope.AddBreadcrumb(breadcrumb);
+            return;
+        }
+
+        _breadcrumbs.Add(breadcrumb);
     }
 
-    public void SetUser(string? userId) => _userId = userId;
+    public void SetUser(string? userId)
+    {
+        _userId = userId;
+        _sessions?.SetUser(userId);
+    }
 
     public void SetTag(string key, string? value)
     {
@@ -117,11 +204,83 @@ public class IntelligenceKitService : IIntelligenceKit
         var intelligenceEvent = BuildExceptionEvent(exception);
         Enrich(intelligenceEvent);
 
+        // Crashes are never sampled out, but BeforeSend/scrubbing still apply.
+        var processed = Process(intelligenceEvent);
+        if (processed is null)
+        {
+            await CloseCrashedSessionAsync();
+            return;
+        }
+        intelligenceEvent = processed;
+
+        _lastEventId = intelligenceEvent.Id;
+
         // Persist only — no flush. The process is dying; the uploader picks this
         // up on the next launch. Both writes are fast local writes; the screenshot
         // bytes were already captured proactively (never on this dying thread).
         await _store.SaveAsync(intelligenceEvent);
         await AttachScreenshotAsync(intelligenceEvent);
+
+        // Close the session as crashed (also persist-only), after the crash itself
+        // is safely stored.
+        await CloseCrashedSessionAsync();
+    }
+
+    private async Task CloseCrashedSessionAsync()
+    {
+        if (_sessions is null)
+            return;
+
+        try
+        {
+            await _sessions.CaptureCrashAsync();
+        }
+        catch
+        {
+            // Release health is best-effort; the crash event is what matters.
+        }
+    }
+
+    /// <summary>Keeps a non-fatal event with probability <see cref="IntelligenceOptions.SampleRate"/>.</summary>
+    private bool Sampled()
+    {
+        var rate = _options.SampleRate;
+        return rate >= 1.0 || (rate > 0.0 && Random.Shared.NextDouble() < rate);
+    }
+
+    /// <summary>
+    /// Runs the user's BeforeSend hook, then PII scrubbing. Returns null when the
+    /// hook dropped the event. A throwing hook is ignored (event sent as-is).
+    /// </summary>
+    private IntelligenceEvent? Process(IntelligenceEvent intelligenceEvent)
+    {
+        if (_options.BeforeSend is { } beforeSend)
+        {
+            try
+            {
+                var result = beforeSend(intelligenceEvent);
+                if (result is null)
+                    return null;
+                intelligenceEvent = result;
+            }
+            catch
+            {
+                // Never let a buggy hook lose the event.
+            }
+        }
+
+        if (_scrubber is not null)
+        {
+            try
+            {
+                _scrubber.Scrub(intelligenceEvent);
+            }
+            catch
+            {
+            }
+        }
+
+        return intelligenceEvent;
     }
 
     /// <summary>
@@ -179,14 +338,22 @@ public class IntelligenceKitService : IIntelligenceKit
 
         // Runtime snapshot + scope.
         intelligenceEvent.DeviceRuntime = SafeCaptureRuntime();
-        intelligenceEvent.UserId ??= _userId;
 
+        // Ambient scope (e.g. the current request) first, then global scope.
+        var scope = IntelligenceScope.Current;
+        intelligenceEvent.UserId ??= scope?.UserId ?? _userId;
+
+        if (scope is not null)
+        {
+            foreach (var kv in scope.Tags)
+                intelligenceEvent.Tags.TryAdd(kv.Key, kv.Value);
+        }
         foreach (var kv in _tags)
             intelligenceEvent.Tags.TryAdd(kv.Key, kv.Value);
 
         // Attach the breadcrumb trail (only if the caller didn't supply one).
         if (intelligenceEvent.Breadcrumbs.Count == 0)
-            intelligenceEvent.Breadcrumbs = _breadcrumbs.Snapshot().ToList();
+            intelligenceEvent.Breadcrumbs = (scope?.Breadcrumbs() ?? _breadcrumbs.Snapshot()).ToList();
     }
 
     private DeviceRuntime? SafeCaptureRuntime()

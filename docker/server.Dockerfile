@@ -20,10 +20,16 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish ./
 
-# Listen on 7099 inside the container (matches the project's http profile).
-ENV ASPNETCORE_URLS=http://+:7099 \
+LABEL org.opencontainers.image.title="IntelligenceKit Server" \
+      org.opencontainers.image.description="Self-hosted ingest/query backend for IntelligenceKit (crash reporting & observability for .NET)." \
+      org.opencontainers.image.source="https://github.com/wilsonvargas/IntelligenceKit" \
+      org.opencontainers.image.licenses="MIT"
+
+# Listens on $PORT (default 7099, the project's http profile). PaaS platforms
+# (Render, Railway, Cloud Run...) inject PORT; an explicit ASPNETCORE_URLS wins.
+ENV PORT=7099 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_gcServer=1
 
 EXPOSE 7099
-ENTRYPOINT ["dotnet", "IntelligenceKit.Server.dll"]
+ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=\"${ASPNETCORE_URLS:-http://+:${PORT}}\" exec dotnet IntelligenceKit.Server.dll"]

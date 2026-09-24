@@ -1,3 +1,4 @@
+#if IOS || MACCATALYST
 using IntelligenceKit.Core.Models;
 using ObjCRuntime;
 
@@ -7,8 +8,9 @@ public partial class CrashReporter
 {
     partial void RegisterPlatformHandlers()
     {
-        // Catches managed exceptions as they cross into native (Objective-C) code,
-        // which is where most iOS crashes surface in a .NET MAUI app. Pure
+        // Shared by iOS and Mac Catalyst (kept outside Platforms/iOS so both TFMs
+        // compile it). Catches managed exceptions as they cross into native
+        // (Objective-C) code, which is where most iOS crashes surface in a .NET MAUI app. Pure
         // managed unhandled exceptions are already handled by the shared
         // AppDomain hook in CrashReporter.cs.
         Runtime.MarshalManagedException += OnMarshalManagedException;
@@ -22,3 +24,4 @@ public partial class CrashReporter
         CaptureFatal(ExceptionInfo.FromException(args.Exception));
     }
 }
+#endif

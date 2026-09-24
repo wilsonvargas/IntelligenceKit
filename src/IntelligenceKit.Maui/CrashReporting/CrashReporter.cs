@@ -67,6 +67,9 @@ public partial class CrashReporter : ICrashReporter
             return;
 
         CaptureBlocking(exception);
+
+        // Lets the next launch ask the user what happened (if enabled).
+        CrashFeedbackPrompt.RememberCrash(_intelligence.LastEventId);
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -80,7 +83,9 @@ public partial class CrashReporter : ICrashReporter
 
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        CaptureBlocking(ExceptionInfo.FromException(e.Exception));
+        // Not fatal: the process keeps running, so report it as a handled error
+        // (a crash capture would wrongly mark the session as crashed).
+        _ = _intelligence.TrackExceptionAsync(ExceptionInfo.FromException(e.Exception));
         e.SetObserved();
     }
 

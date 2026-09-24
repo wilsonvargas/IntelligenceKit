@@ -15,8 +15,16 @@ RUN dotnet publish src/IntelligenceKit.Dashboard/IntelligenceKit.Dashboard.cspro
 # ---- runtime --------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
 
-# SPA routing + WASM MIME/caching rules.
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+LABEL org.opencontainers.image.title="IntelligenceKit Dashboard" \
+      org.opencontainers.image.description="Blazor WebAssembly dashboard for IntelligenceKit." \
+      org.opencontainers.image.source="https://github.com/wilsonvargas/IntelligenceKit" \
+      org.opencontainers.image.licenses="MIT"
+
+# SPA routing + WASM MIME/caching rules. Installed as a template: the nginx
+# image substitutes environment variables (here ${PORT}, default 80, which PaaS
+# platforms may inject) into /etc/nginx/templates/*.template at start.
+ENV PORT=80
+COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 
 # Static site (the published Blazor output lives under wwwroot).
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html

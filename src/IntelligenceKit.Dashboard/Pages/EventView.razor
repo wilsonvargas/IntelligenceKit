@@ -41,7 +41,15 @@ else
                         @Field("Project", _event.ProjectId)
                         @Field("Environment", _event.Environment)
                         @Field("Release", _event.Release)
-                        @Field("User", _event.UserId)
+                        @if (!string.IsNullOrWhiteSpace(_event.UserId))
+                        {
+                            <dt class="col-sm-4 text-muted fw-normal">User</dt>
+                            <dd class="col-sm-8"><a href="@($"/users/{Uri.EscapeDataString(_event.UserId)}?projectId={Uri.EscapeDataString(_event.ProjectId)}")">@_event.UserId</a></dd>
+                        }
+                        else
+                        {
+                            @Field("User", null)
+                        }
                         @Field("Application", $"{_event.ApplicationName} {_event.ApplicationVersion}")
                         @Field("Platform", _event.Platform)
                         @Field("Operating system", _event.OperatingSystem)
@@ -133,9 +141,17 @@ else
         </div>
     }
 
+    <FeedbackList Items="_feedback" />
+
     @if (_event.Exception is not null)
     {
-        <h2 class="h5 mb-2">Exception</h2>
+        <h2 class="h5 mb-2">
+            Exception
+            @if (_event.Symbolicated)
+            {
+                <span class="badge text-bg-info fs-6 align-middle" title="File/line or Java names recovered from uploaded debug symbols">symbolicated</span>
+            }
+        </h2>
         var level = 0;
         var ex = _event.Exception;
         while (ex is not null)
@@ -189,6 +205,7 @@ else
     private bool _notFound;
     private bool _showScreenshot;
     private string? _error;
+    private IReadOnlyList<FeedbackInfo>? _feedback;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -196,10 +213,12 @@ else
         _notFound = false;
         _showScreenshot = false;
         _event = null;
+        _feedback = null;
         try
         {
             _event = await Api.GetEventAsync(Id);
             _notFound = _event is null;
+            _feedback = _event is null ? null : await Api.GetEventFeedbackAsync(Id);
         }
         catch (Exception ex)
         {

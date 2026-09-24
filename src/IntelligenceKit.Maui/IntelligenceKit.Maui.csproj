@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0-android;net10.0-ios</TargetFrameworks>
+		<TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
 		<UseMaui>true</UseMaui>
 		<SingleProject>true</SingleProject>
@@ -28,7 +29,7 @@
 		<IsPackable>true</IsPackable>
 		<PackageId>IntelligenceKit.Maui</PackageId>
 		<Title>IntelligenceKit for .NET MAUI</Title>
-		<Description>One-line, self-hosted crash reporting and observability for .NET MAUI (Android/iOS) — a Sentry/App Center/Crashlytics alternative for the .NET ecosystem. Typed crash capture, offline store-and-forward, breadcrumbs, device context and opt-in last-screen capture, all via builder.UseIntelligenceKit(dsn).</Description>
+		<Description>One-line, self-hosted crash reporting and observability for .NET MAUI (Android, iOS, Mac Catalyst, Windows) — a Sentry/App Center/Crashlytics alternative for the .NET ecosystem. Typed crash capture, offline store-and-forward, breadcrumbs, device context and opt-in last-screen capture, all via builder.UseIntelligenceKit(dsn).</Description>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -50,6 +51,7 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\IntelligenceKit.Core\IntelligenceKit.Core.csproj" />
+	  <ProjectReference Include="..\IntelligenceKit.Extensions.Logging\IntelligenceKit.Extensions.Logging.csproj" />
 	</ItemGroup>
 
 </Project>

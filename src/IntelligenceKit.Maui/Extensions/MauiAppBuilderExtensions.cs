@@ -3,13 +3,14 @@ using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Providers;
 using IntelligenceKit.Core.Services;
 using IntelligenceKit.Core.Storage;
+using IntelligenceKit.Extensions.Logging;
 using IntelligenceKit.Maui.CrashReporting;
 using IntelligenceKit.Maui.Diagnostics;
 using IntelligenceKit.Maui.Providers;
-using IntelligenceKit.Maui.Services;
 using IntelligenceKit.Maui.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Hosting;
+using Microsoft.Maui.LifecycleEvents;
 
 namespace IntelligenceKit.Maui.Extensions;
 
@@ -39,6 +40,30 @@ public static class MauiAppBuilderExtensions
         builder.Services.AddSingleton(options);
 
         builder.Services.AddHttpClient<IIntelligenceClient, HttpIntelligenceClient>();
+
+        // Release health: session tracking driven by the app lifecycle.
+        builder.Services.AddSingleton<IInstallationIdProvider, MauiInstallationIdProvider>();
+        if (options.EnableAutoSessionTracking)
+            builder.Services.AddSingleton<ISessionTracker, SessionTracker>();
+
+        // ILogger integration: logs become breadcrumbs (Information+) and events (Error+).
+        if (options.EnableLoggingIntegration)
+            builder.Logging.AddIntelligenceKit();
+
+        // Performance: app start / page load timing, plus HTTP spans for clients that
+        // opt in via AddIntelligenceKitHandler().
+        if (options.EnablePerformanceMonitoring)
+            builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
+
+        // Frozen-UI (ANR) detection: a background watchdog pinging the main thread.
+        if (options.EnableAnrDetection)
+        {
+            builder.Services.AddSingleton<IUiThreadDispatcher, MauiUiThreadDispatcher>();
+            builder.Services.AddSingleton<UiThreadWatchdog>();
+        }
+
+        if (options.EnableAutoSessionTracking || options.EnableAnrDetection || options.EnablePerformanceMonitoring)
+            builder.ConfigureLifecycleEvents(RegisterAppLifecycle);
         builder.Services.AddSingleton<IIntelligenceKit, IntelligenceKitService>();
         builder.Services.AddSingleton<IDeviceContextProvider, MauiDeviceContextProvider>();
 
@@ -61,8 +86,73 @@ public static class MauiAppBuilderExtensions
         // Crash reporting + startup work (register handlers, initial flush,
         // flush on reconnect). Activated automatically; no host-app code needed.
         builder.Services.AddSingleton<ICrashReporter, CrashReporter>();
+        builder.Services.AddSingleton<CrashFeedbackPrompt>();
         builder.Services.AddSingleton<IMauiInitializeService, IntelligenceKitStartup>();
 
         return builder;
+    }
+
+    /// <summary>
+    /// Foreground/background hooks: the session is paused in the background and
+    /// resumed (or restarted, after <c>SessionTimeout</c>) when the app returns; the
+    /// ANR watchdog only watches while the app is in the foreground.
+    /// </summary>
+    private static void RegisterAppLifecycle(ILifecycleBuilder events)
+    {
+#if ANDROID
+        events.AddAndroid(android => android
+            .OnStart(activity => OnForeground())
+            .OnStop(activity => OnBackground()));
+#elif IOS || MACCATALYST
+        events.AddiOS(ios => ios
+            .WillEnterForeground(application => OnForeground())
+            .DidEnterBackground(application => OnBackground()));
+#elif WINDOWS
+        // Desktop has no background state; a minimized/hidden window is the
+        // closest equivalent, and closing the window ends the run.
+        events.AddWindows(windows => windows
+            .OnVisibilityChanged((window, args) =>
+            {
+                if (args.Visible)
+                    OnForeground();
+                else
+                    OnBackground();
+            })
+            .OnClosed((window, args) => OnClosing()));
+#endif
+    }
+
+    private static void OnForeground()
+    {
+        var services = IPlatformApplication.Current?.Services;
+        _ = services?.GetService<ISessionTracker>()?.ResumeAsync();
+        services?.GetService<UiThreadWatchdog>()?.Start();
+    }
+
+    private static void OnBackground() => _ = BackgroundAsync();
+
+    /// <summary>
+    /// The process is about to exit (desktop window closed): give the session update
+    /// and buffered spans a bounded moment to reach the local queue. Runs off the UI
+    /// thread so awaiting inside can't deadlock on it.
+    /// </summary>
+    private static void OnClosing()
+    {
+        try
+        {
+            Task.Run(BackgroundAsync).Wait(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+        }
+    }
+
+    private static Task BackgroundAsync()
+    {
+        var services = IPlatformApplication.Current?.Services;
+        services?.GetService<UiThreadWatchdog>()?.Pause();
+        return Task.WhenAll(
+            services?.GetService<ISessionTracker>()?.PauseAsync() ?? Task.CompletedTask,
+            services?.GetService<IPerformanceMonitor>()?.FlushAsync() ?? Task.CompletedTask);
     }
 }

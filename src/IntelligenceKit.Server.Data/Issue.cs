@@ -34,4 +34,49 @@ public class Issue
 
     /// <summary>Id of the most recently ingested event in this group.</summary>
     public Guid LastEventId { get; set; }
+
+    /// <summary>Triage state — one of <see cref="IssueStatuses"/>.</summary>
+    public string Status { get; set; } = IssueStatuses.Unresolved;
+
+    /// <summary>When the issue was last marked resolved. Null while unresolved.</summary>
+    public DateTime? ResolvedAt { get; set; }
+
+    /// <summary>
+    /// Release the fix shipped in ("resolve in release X"). Events from releases
+    /// that are provably older don't reopen the issue. Null = any new event reopens it.
+    /// </summary>
+    public string? ResolvedInRelease { get; set; }
+
+    /// <summary>True once a resolved issue received a new event (a regression).
+    /// Cleared when the issue is resolved again.</summary>
+    public bool IsRegression { get; set; }
+
+    /// <summary>When the latest regression was detected.</summary>
+    public DateTime? RegressedAt { get; set; }
+
+    /// <summary>Free-form owner (name/email/handle). Null = unassigned.</summary>
+    public string? AssignedTo { get; set; }
+
+    /// <summary>Release of the first event — "introduced in". Null when unknown.</summary>
+    public string? FirstRelease { get; set; }
+
+    /// <summary>Release of the most recent event.</summary>
+    public string? LastRelease { get; set; }
+
+    /// <summary>Linked GitHub/Jira issue, once one was created from here.</summary>
+    public string? ExternalIssueUrl { get; set; }
+}
+
+/// <summary>Allowed values for <see cref="Issue.Status"/>.</summary>
+public static class IssueStatuses
+{
+    public const string Unresolved = "Unresolved";
+    public const string Resolved = "Resolved";
+    public const string Ignored = "Ignored";
+
+    public static readonly IReadOnlyList<string> All = [Unresolved, Resolved, Ignored];
+
+    /// <summary>Canonical casing for a user-supplied status, or null when unknown.</summary>
+    public static string? Normalize(string? value)
+        => All.FirstOrDefault(s => string.Equals(s, value?.Trim(), StringComparison.OrdinalIgnoreCase));
 }

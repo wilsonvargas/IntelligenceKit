@@ -1,3 +1,4 @@
+using IntelligenceKit.Core.Diagnostics;
 using IntelligenceKit.Core.Services;
 using IntelligenceKit.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,15 @@ internal sealed class IntelligenceKitStartup : IMauiInitializeService
 
         // Begin proactive screen capture (no-op unless EnableScreenCapture is set).
         services.GetRequiredService<ScreenCaptureService>().Start();
+
+        // Begin the first session (only registered when auto session tracking is on).
+        _ = services.GetService<ISessionTracker>()?.StartAsync();
+
+        // Ask about last session's crash (no-op unless EnableCrashFeedbackPrompt).
+        services.GetRequiredService<CrashFeedbackPrompt>().Start();
+
+        // Start watching for a frozen UI (only registered when ANR detection is on).
+        services.GetService<UiThreadWatchdog>()?.Start();
 
         var uploader = services.GetRequiredService<IEventUploader>();
 

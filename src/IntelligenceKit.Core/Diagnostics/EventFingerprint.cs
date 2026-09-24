@@ -9,66 +9,118 @@ namespace IntelligenceKit.Core.Diagnostics;
 /// Derives a stable grouping key ("fingerprint") for an event so that repeated
 /// occurrences of the same problem collapse into a single issue.
 ///
-/// For exceptions the key is <c>projectId + exceptionType + top stack frame</c>;
-/// for everything else it falls back to <c>projectId + eventType + a normalized
-/// message</c> (digits and GUIDs stripped) so that "User 12 not found" and
-/// "User 34 not found" group together.
+/// For exceptions the key is <c>projectId + exceptionType + top in-app frame</c>:
+/// frames from the runtime/framework (System.*, Microsoft.*, Android.*, java.*…)
+/// are skipped so a crash inside LINQ called from two different places doesn't
+/// merge into one issue, and compiler-generated async/lambda names are normalized
+/// so recompiling doesn't split an issue. For everything else it falls back to
+/// <c>projectId + eventType + a normalized message</c> (digits and GUIDs stripped)
+/// so that "User 12 not found" and "User 34 not found" group together.
+///
+/// An event can override all of this with <see cref="IntelligenceEvent.Fingerprint"/>.
 /// </summary>
 public static partial class EventFingerprint
 {
+    /// <summary>Placeholder in a custom fingerprint that expands to the default grouping key.</summary>
+    public const string DefaultToken = "{{ default }}";
+
+    /// <summary>Frame prefixes considered framework/runtime code (not "in-app").</summary>
+    public static readonly IReadOnlyList<string> FrameworkPrefixes =
+    [
+        "System.", "Microsoft.", "Mono.", "Xamarin.", "Android.", "AndroidX.", "Java.", "Javax.",
+        "Foundation.", "UIKit.", "ObjCRuntime.", "CoreFoundation.", "WinRT.", "Windows.",
+        "IntelligenceKit.", "Newtonsoft.", "SQLite.", "SQLitePCL.",
+        "java.", "javax.", "android.", "androidx.", "kotlin.", "kotlinx.", "dalvik.", "com.android.", "sun.", "libcore."
+    ];
+
     public sealed record Result(string Fingerprint, string Title, string? Culprit);
 
     public static Result Compute(IntelligenceEvent e)
     {
+        var (basis, title, culprit) = DefaultBasis(e);
+
+        if (e.Fingerprint is { Count: > 0 } custom)
+        {
+            var parts = custom.Select(v => v == DefaultToken ? basis : $"custom:{v}");
+            return new Result(Hash($"{e.ProjectId}\n{string.Join('\n', parts)}"), title, culprit);
+        }
+
+        return new Result(Hash(basis), title, culprit);
+    }
+
+    private static (string Basis, string Title, string? Culprit) DefaultBasis(IntelligenceEvent e)
+    {
         if (e.Exception is { } ex && !string.IsNullOrWhiteSpace(ex.Type))
         {
             var frame = TopFrame(ex.StackTrace);
-            var title = ShortTypeName(ex.Type);
             var culprit = frame is null ? null : ShortFrame(frame);
-            var fingerprint = Hash($"{e.ProjectId}\n{ex.Type}\n{frame}");
-            return new Result(fingerprint, title, culprit);
+            return ($"{e.ProjectId}\n{ex.Type}\n{frame}", ShortTypeName(ex.Type), culprit);
         }
 
         var message = e.Message ?? string.Empty;
-        var normalized = NormalizeMessage(message);
         var fallbackTitle = string.IsNullOrWhiteSpace(message)
             ? e.EventType.ToString()
             : Truncate(message, 120);
 
-        return new Result(
-            Hash($"{e.ProjectId}\n{e.EventType}\n{normalized}"),
-            fallbackTitle,
-            null);
+        return ($"{e.ProjectId}\n{e.EventType}\n{NormalizeMessage(message)}", fallbackTitle, null);
     }
 
-    /// <summary>First "at ..." frame of a stack trace, with the file/line suffix removed.</summary>
-    private static string? TopFrame(string? stackTrace)
+    /// <summary>
+    /// First in-app frame of a stack trace (falling back to the first frame when
+    /// every frame is framework code), normalized: file/line suffix removed and
+    /// compiler-generated async/lambda names collapsed to their method.
+    /// </summary>
+    public static string? TopFrame(string? stackTrace)
     {
         if (string.IsNullOrWhiteSpace(stackTrace))
             return null;
 
+        string? first = null;
         foreach (var raw in stackTrace.Split('\n'))
         {
             var line = raw.Trim();
+            if (!line.StartsWith("at ", StringComparison.Ordinal))
+                continue; // headers, "--- End of stack trace ---", "Caused by:" …
+
+            line = NormalizeFrame(line[3..]);
             if (line.Length == 0)
                 continue;
 
-            if (line.StartsWith("at ", StringComparison.Ordinal))
-                line = line[3..];
-
-            // Drop the volatile " in <file>:line N" tail so line-number churn
-            // doesn't split one problem into many issues.
-            var inIndex = line.IndexOf(" in ", StringComparison.Ordinal);
-            if (inIndex >= 0)
-                line = line[..inIndex];
-
-            line = line.Trim();
-            if (line.Length > 0)
+            first ??= line;
+            if (!IsFrameworkFrame(line))
                 return line;
         }
 
-        return null;
+        return first ?? FirstNonEmptyLine(stackTrace);
     }
+
+    public static bool IsFrameworkFrame(string frame)
+    {
+        foreach (var prefix in FrameworkPrefixes)
+        {
+            if (frame.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
+    private static string NormalizeFrame(string frame)
+    {
+        // Drop the volatile " in <file>:line N" tail (managed) and "(File.java:12)"
+        // line numbers (Java) so line-number churn doesn't split one problem.
+        var inIndex = frame.IndexOf(" in ", StringComparison.Ordinal);
+        if (inIndex >= 0)
+            frame = frame[..inIndex];
+        frame = JavaLocation().Replace(frame, "");
+
+        // "Cart.<Checkout>d__5.MoveNext()" → "Cart.Checkout()"; "<Run>b__0_1" → "Run".
+        frame = AsyncStateMachine().Replace(frame, "$1()");
+        frame = Lambda().Replace(frame, "$1");
+        return frame.Trim();
+    }
+
+    private static string? FirstNonEmptyLine(string text)
+        => text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0);
 
     /// <summary>Compact "Type.Method" form of a frame, for display as the culprit.</summary>
     private static string ShortFrame(string frame)
@@ -110,4 +162,13 @@ public static partial class EventFingerprint
 
     [GeneratedRegex(@"\d+")]
     private static partial Regex DigitsRegex();
+
+    [GeneratedRegex(@"<([^>]+)>d__\d+\.MoveNext\(\)")]
+    private static partial Regex AsyncStateMachine();
+
+    [GeneratedRegex(@"<([^>]+)>b__[\d_]+")]
+    private static partial Regex Lambda();
+
+    [GeneratedRegex(@"\((?:[^():]+\.(?:java|kt)|SourceFile|Unknown Source|Native Method):?\d*\)$")]
+    private static partial Regex JavaLocation();
 }

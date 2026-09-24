@@ -2,11 +2,12 @@
 
   <!--
     Shared metadata for everything under src/. Only the publishable SDK packages
-    (Core, Maui) set <IsPackable>true</IsPackable>; the backend, dashboard and
+    (Core, Maui, Hosting, Extensions.Logging, AspNetCore, Blazor, Wpf, WinForms,
+    Avalonia) set <IsPackable>true</IsPackable>; the backend, dashboard and
     migration assemblies inherit the default below and are never packed.
   -->
   <PropertyGroup>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>Wilson Vargas</Authors>
     <Company>IntelligenceKit</Company>
     <Product>IntelligenceKit</Product>

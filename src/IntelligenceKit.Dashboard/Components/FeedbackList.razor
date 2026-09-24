@@ -1,0 +1,37 @@
+@* User-written feedback ("what were you doing?") attached to crashes/events. *@
+
+@if (Items is { Count: > 0 })
+{
+    <h2 class="h6 mb-2">User feedback <span class="badge text-bg-secondary">@Items.Count</span></h2>
+    <div class="mb-4">
+        @foreach (var f in Items)
+        {
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div class="mb-1" style="white-space: pre-wrap">@f.Comments</div>
+                    <div class="small text-muted">
+                        @f.CreatedAt.ToLocalTime().ToString("g")
+                        @if (!string.IsNullOrWhiteSpace(f.Name) || !string.IsNullOrWhiteSpace(f.Email))
+                        {
+                            <text> · @f.Name @(string.IsNullOrWhiteSpace(f.Email) ? "" : $"<{f.Email}>")</text>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(f.UserId))
+                        {
+                            <text> · user @f.UserId</text>
+                        }
+                        @if (ShowEventLink)
+                        {
+                            <text> · </text><a href="@($"/events/{f.EventId}")">event</a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<FeedbackInfo>? Items { get; set; }
+
+    [Parameter] public bool ShowEventLink { get; set; }
+}

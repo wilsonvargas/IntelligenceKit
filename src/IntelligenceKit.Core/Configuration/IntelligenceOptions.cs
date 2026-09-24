@@ -1,3 +1,6 @@
+using System.Text.RegularExpressions;
+using IntelligenceKit.Core.Models;
+
 namespace IntelligenceKit.Core.Configuration;
 
 public class IntelligenceOptions
@@ -52,4 +55,87 @@ public class IntelligenceOptions
     public bool EnableCrashReporting { get; set; } = true;
 
     public bool EnableDeviceInfo { get; set; } = true;
+
+    /// <summary>
+    /// Track app sessions automatically (start at launch, pause/resume with the app
+    /// lifecycle) so the dashboard can show crash-free sessions/users per release.
+    /// </summary>
+    public bool EnableAutoSessionTracking { get; set; } = true;
+
+    /// <summary>
+    /// How long the app may stay in the background before returning to it starts a
+    /// new session instead of continuing the previous one.
+    /// </summary>
+    public TimeSpan SessionTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Report "Application Not Responding" when the UI thread is blocked for longer
+    /// than <see cref="AnrThreshold"/>.
+    /// </summary>
+    public bool EnableAnrDetection { get; set; } = true;
+
+    /// <summary>How long the UI thread may be unresponsive before it counts as an ANR (default 5 s, like Android).</summary>
+    public TimeSpan AnrThreshold { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Platform SDKs that host Microsoft.Extensions.Logging (e.g. MAUI) register the
+    /// IntelligenceKit logger provider automatically: Information+ logs become
+    /// breadcrumbs and Error+ logs become events.
+    /// </summary>
+    public bool EnableLoggingIntegration { get; set; } = true;
+
+    /// <summary>
+    /// Measure app start, page load and (with the HTTP handler) request durations,
+    /// and ship them as batched performance spans.
+    /// </summary>
+    public bool EnablePerformanceMonitoring { get; set; } = true;
+
+    /// <summary>Fraction (0.0–1.0) of performance spans to keep.</summary>
+    public double PerformanceSampleRate { get; set; } = 1.0;
+
+    /// <summary>How often buffered spans are shipped (also on background / every 50 spans).</summary>
+    public TimeSpan PerformanceFlushInterval { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// On the next launch after a crash, ask the user what they were doing and send
+    /// the answer linked to the crash (platform SDKs with UI). Off by default.
+    /// </summary>
+    public bool EnableCrashFeedbackPrompt { get; set; }
+
+    public string CrashFeedbackTitle { get; set; } = "The app closed unexpectedly";
+
+    public string CrashFeedbackMessage { get; set; } = "Tell us what you were doing so we can fix it (optional).";
+
+    public string CrashFeedbackAccept { get; set; } = "Send";
+
+    public string CrashFeedbackCancel { get; set; } = "Skip";
+
+    /// <summary>
+    /// Last chance to modify or drop an event before it is stored and sent. Runs
+    /// after enrichment and before PII scrubbing. Return null to drop the event. If
+    /// the callback throws, the event is sent unmodified. Also runs for crashes
+    /// (keep it fast and side-effect free).
+    /// </summary>
+    public Func<IntelligenceEvent, IntelligenceEvent?>? BeforeSend { get; set; }
+
+    /// <summary>Modify or drop (return null) a breadcrumb before it enters the trail.</summary>
+    public Func<Breadcrumb, Breadcrumb?>? BeforeBreadcrumb { get; set; }
+
+    /// <summary>
+    /// Fraction (0.0–1.0) of non-fatal events (handled exceptions, logs, ANRs) to
+    /// keep. Fatal crashes and session updates are never sampled out.
+    /// </summary>
+    public double SampleRate { get; set; } = 1.0;
+
+    /// <summary>
+    /// Mask personal data and secrets (emails, tokens, card numbers, sensitive keys)
+    /// before events leave the device. On by default.
+    /// </summary>
+    public bool EnablePiiScrubbing { get; set; } = true;
+
+    /// <summary>Extra key fragments whose values are always replaced by "[Filtered]".</summary>
+    public List<string> ScrubbingSensitiveKeys { get; set; } = new();
+
+    /// <summary>Extra patterns masked in free text (messages, breadcrumbs, string values).</summary>
+    public List<Regex> ScrubbingPatterns { get; set; } = new();
 }

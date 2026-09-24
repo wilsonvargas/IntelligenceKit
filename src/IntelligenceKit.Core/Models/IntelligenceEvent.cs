@@ -56,4 +56,21 @@ public class IntelligenceEvent
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
     public Dictionary<string, object?> Data { get; set; } = new();
+
+    /// <summary>
+    /// Optional custom grouping. When set, events with the same values land in the
+    /// same issue regardless of their stack trace. Use <see cref="Diagnostics.EventFingerprint.DefaultToken"/>
+    /// ("{{ default }}") as one of the values to refine the default grouping instead
+    /// of replacing it, e.g. <c>["{{ default }}", tenantId]</c>.
+    /// </summary>
+    public List<string>? Fingerprint { get; set; }
+
+    /// <summary>Session state. Only set on <see cref="EventType.Session"/> events.</summary>
+    public SessionInfo? Session { get; set; }
+
+    /// <summary>Batched timings. Only set on <see cref="EventType.Performance"/> events sent by the SDK.</summary>
+    public List<PerformanceSpan>? Spans { get; set; }
+
+    /// <summary>Only set on <see cref="EventType.Feedback"/> events.</summary>
+    public UserFeedback? Feedback { get; set; }
 }
